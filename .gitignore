@@ -1,0 +1,10 @@
+.env
+.env.local
+.env.*.local
+.vercel/
+.runtime/
+outputs/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/

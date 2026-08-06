@@ -406,44 +406,33 @@ class MiniQMTBoxTrader:
 # ==========================================
 # 5. 主运行示例 (VSC 直接运行入口)
 # ==========================================
+def run_demo(
+    interest_rate=0.03,
+    actionpoint=0.0001,
+    desir_mount=1,
+    data_mode="demo",
+    top_n=20,
+    min_volume=1,
+):
+    """Run the read-only market-wide option scanner used by the web app.
+
+    The scanner covers all discoverable SSE/SZSE ETF options and CFFEX equity
+    index options.  It never connects to MiniQMT or submits an order.  The
+    historical four-contract fixture was removed from the web path.
+    """
+    from option_market_scanner import run_option_market_scan
+
+    return run_option_market_scan(
+        data_mode=str(data_mode),
+        top_n=int(top_n),
+        interest_rate=float(interest_rate),
+        actionpoint=float(actionpoint),
+        desir_mount=int(desir_mount),
+        min_volume=int(min_volume),
+    )
+
+
 if __name__ == "__main__":
-    # 模拟行情数据
-    mock_hq_data = pd.DataFrame(
-        {
-            "bid1": [0.1520, 0.0350, 0.2200, 0.0120],
-            "bid_vol1": [100, 80, 120, 90],
-            "ask1": [0.1525, 0.0355, 0.2205, 0.0125],
-            "ask_vol1": [100, 80, 120, 90],
-        },
-        index=[
-            "10004001.SH",
-            "10004002.SH",
-            "10004003.SH",
-            "10004004.SH",
-        ],
-    )
+    import json
 
-    mock_olist = pd.DataFrame({
-        "code": ["10004001.SH", "10004002.SH", "10004003.SH", "10004004.SH"],
-        "expire_date": [20260826, 20260826, 20260826, 20260826],
-        "strike": [2.50, 2.50, 2.60, 2.60],
-        "option_type": ["C", "P", "C", "P"],
-    })
-
-    mock_holding = pd.DataFrame(columns=["code", "side", "amount"])
-
-    # 实例化策略
-    strategy = BoxArbitrageStrategy(
-        interest_rate=0.03, actionpoint=0.0001, desir_mount=1
-    )
-    orders_df, record = strategy.calculate_arbitrage(
-        mock_hq_data, mock_holding, mock_olist
-    )
-
-    if orders_df is not None:
-        print("=== 套利收益满足！生成订单矩阵 ===")
-        print(orders_df)
-        print("\n=== 交易细节 ===")
-        print(record)
-    else:
-        print("当前盘口无满足条件的盒式套利机会。")
+    print(json.dumps(run_demo(data_mode="auto"), ensure_ascii=False, indent=2))

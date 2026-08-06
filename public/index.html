@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A 股多因子选股与 Python 量化策略 Vercel 运行看板" />
+    <title>A 股量化选股看板</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="glow glow-one"></div><div class="glow glow-two"></div>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="返回首页"><span class="brand-mark">Q</span><span>Quant Console</span></a>
+      <div class="runtime-pill"><span class="live-dot"></span><span id="runtime-state">API 检测中</span></div>
+    </header>
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">A-SHARE · MULTI-FACTOR · QP</p>
+          <h1 id="app-name">A 股量化选股<br /><span>清晰可复核。</span></h1>
+          <p id="app-subtitle" class="hero-copy">从沪深 A 股可交易池生成可解释的多因子候选组合</p>
+        </div>
+        <div class="hero-stats" aria-label="项目概况">
+          <div><strong id="ready-count">—</strong><span>云端可运行</span></div>
+          <div><strong id="program-count">—</strong><span>展示项目</span></div>
+          <div><strong id="python-version">—</strong><span>Python</span></div>
+        </div>
+      </section>
+      <section class="workspace">
+        <aside class="program-panel">
+          <div class="section-heading"><div><p class="eyebrow">PROGRAMS</p><h2>选择程序</h2></div><span id="program-total" class="count-badge">0</span></div>
+          <div id="program-list" class="program-list" aria-live="polite"><div class="skeleton tall"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+        </aside>
+        <section class="console-panel">
+          <div id="empty-console" class="empty-console"><div class="empty-icon">◫</div><h2>选择一个程序</h2><p>查看说明、调整参数并运行云端分析。</p></div>
+          <div id="active-console" class="active-console hidden">
+            <div class="console-topbar">
+              <div><p id="active-category" class="eyebrow"></p><h2 id="active-title"></h2><p id="active-description" class="muted"></p></div>
+              <span id="active-status" class="status-badge"></span>
+            </div>
+            <div id="program-notice" class="notice info hidden"></div>
+            <div id="local-warning" class="notice warning hidden"></div>
+            <form id="run-form"><div id="parameter-fields" class="parameter-grid"></div><button id="run-button" class="run-button" type="submit"><span class="button-label">运行程序</span><span class="button-arrow">→</span></button></form>
+            <div id="result-area" class="result-area hidden" aria-live="polite">
+              <div class="result-header"><div><span class="live-dot"></span><strong>运行结果</strong></div><span id="duration" class="duration"></span></div>
+              <div id="source-banner" class="source-banner hidden"></div>
+              <div id="metric-grid" class="metric-grid"></div>
+              <div id="selection-wrap" class="selection-wrap hidden">
+                <div class="table-title"><div><h3>A 股候选标的</h3><p id="selection-subtitle"></p></div><span>目标权重来自完整候选池优化</span></div>
+                <div class="table-scroll"><table class="selection-table"><thead><tr><th>#</th><th>代码 / 名称</th><th>板块</th><th>最新价</th><th>60日动量</th><th>P/E</th><th>P/B</th><th>目标权重</th><th>主动权重</th><th>主要入选理由</th></tr></thead><tbody id="selection-body"></tbody></table></div>
+              </div>
+              <div id="option-wrap" class="selection-wrap hidden">
+                <div class="table-title"><div><h3>全市场盒式价差候选</h3><p id="option-subtitle"></p></div><span>ETF / 股指期权 · 只读快照</span></div>
+                <div class="table-scroll"><table class="selection-table option-table"><thead><tr><th>#</th><th>标的</th><th>交易所</th><th>到期日</th><th>K Low</th><th>K High</th><th>理论现值</th><th>四腿净支出</th><th>单位理论收益</th><th>收益偏差</th><th>最小成交量</th><th>报价口径</th></tr></thead><tbody id="option-body"></tbody></table></div>
+              </div>
+              <div id="orders-wrap" class="orders-wrap hidden">
+                <div class="table-title"><h3>模拟订单</h3><span>只读 · 不会下单</span></div>
+                <div class="table-scroll"><table><thead><tr><th>合约</th><th>方向</th><th>动作</th><th>数量</th><th>价格</th></tr></thead><tbody id="orders-body"></tbody></table></div>
+              </div>
+              <details class="methodology" id="methodology-wrap"><summary>模型口径与限制</summary><div id="methodology-content"></div></details>
+              <details class="raw-result"><summary>查看完整 JSON</summary><pre id="json-output"></pre></details>
+            </div>
+          </div>
+        </section>
+      </section>
+      <footer><span id="public-notice">选股结果仅用于研究展示，不构成投资建议，也不会触发真实交易。</span><span>Built for Vercel</span></footer>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

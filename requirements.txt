@@ -1,0 +1,5 @@
+akshare==1.18.73
+numpy>=2.0,<3
+pandas>=2.2,<4
+requests>=2.31,<3
+scipy>=1.13,<2
