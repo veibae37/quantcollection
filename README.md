@@ -3,14 +3,16 @@
 这是一个可直接部署到 Vercel 的静态网页 + Python Function 项目。网页当前安全开放：
 
 - `a_share_selector.py`：从沪深 A 股快照过滤可交易池，完成多因子 Alpha 和带约束 QP 优化，并在网页输出候选标的与目标权重。
-- `boxoption2.py`：扫描沪深 ETF 期权与中金所股指期权，展示按标的、到期日和行权价正确配对的盒式价差候选。
+- `boxoption2.py`：扫描沪深 ETF 期权，展示按标的、到期日和行权价正确配对且扣费后真实净利润为正的盒式价差候选。
 - `bigmoneyflow.py`：通过 AkShare 获取 ETF 行情，展示成交额代理流入与盘后放量状态。
 - Python 运行环境：确认 Vercel Function 的 Python 版本、区域和运行状态。
 - 项目程序概览：列出根目录 Python 文件及云端兼容状态。
 
 页面不会连接 MiniQMT，也不会执行真实下单。`bigmoneyflow.py` 的“流入”是成交额代理指标，并非真实资金净流入。`boxoption.py`、`connect.py`、`order_588000.py` 等程序依赖本机 Windows/QMT/券商账户，只在页面展示状态，不开放云端执行。
 
-期权扫描覆盖中国内地真实上市的权益类期权：上交所/深交所 ETF 期权，以及中金所沪深300、中证1000、上证50股指期权。中国市场目前并不是每只 A 股都有独立个股期权，因此页面不会伪造“全体股票个股期权”。实时源不可用时，自动模式会切换到覆盖 12 个真实产品族、数百张合约结构的明确演示快照，不再使用固定四张合约。
+期权扫描覆盖 QMT“上证期权”和“深证期权”板块中的沪深 ETF 期权。中国市场并不是每只 A 股都有独立个股期权，因此程序不会伪造“全体股票个股期权”。本地工作进程会动态发现当前全部有效 ETF 期权合约，不再依赖固定四张合约；网页演示模式覆盖 9 个 ETF 产品族、数百张合约结构。
+
+盒式套利严格使用买卖一可执行方向。所有权利金和行权价先保留为每单位价格；每单位理论利润乘合约乘数 10000 后才成为一套组合的人民币毛利润，随后扣除 `1.7 × 4 = 6.8` 元手续费和 `0.0001 × 10000 × 4 = 4.0` 元滑点。网页和 webhook 只输出 `True_Net_Profit_CNY > 0` 的结果。
 
 ## A 股选股网页
 
@@ -33,6 +35,28 @@ python -c "from a_share_selector import run_a_share_selection; print(run_a_share
 5. 点击 Deploy。部署完成后访问 Vercel 分配的 `*.vercel.app` 地址。
 
 Vercel 会依据 `.python-version` 使用 Python 3.12，并从 `requirements.txt` 安装 AkShare、pandas、NumPy 和 SciPy。`public/` 是静态页面，`api/` 中的文件会成为 Python Functions。
+
+## MiniQMT 实时期权扫描与推送
+
+`scanner_worker.py` 只能在已启动并登录 QMT/MiniQMT 的本地 Windows 主机运行。程序默认推送到 `https://quantcollection-aa5n.vercel.app/api/options`，也可用 `OPTIONS_WEBHOOK_URL` 覆盖。程序会依次加载本地 `.env` 和 `.env.local`；请在 Vercel 项目和本地配置相同的 `OPTIONS_WEBHOOK_SECRET`（以及可选的 `OPTIONS_SECRET_HEADER`）。真实密钥不要提交 Git。
+
+当前仓库是静态网页 + Python Functions，因此实际部署接收端为 `api/options.py`，URL 是 `/api/options`。同时提供了用户要求的 Next.js App Router 版本 `app/api/options/route.ts`；将来迁移到 Next.js 时可直接采用，但不要在同一部署中同时维护两套同路径运行时。
+
+先本地只算不推送：
+
+```powershell
+python -B scanner_worker.py --once --dry-run
+```
+
+确认输出后启动每 5 秒扫描并推送：
+
+```powershell
+$env:OPTIONS_WEBHOOK_URL="https://your-project.vercel.app/api/options"
+$env:OPTIONS_WEBHOOK_SECRET="使用至少24位的随机密钥"
+python -B scanner_worker.py
+```
+
+Vercel 接口会验证共享密钥、JSON 大小、四腿结构、10000 乘数、6.8 元手续费、4.0 元滑点以及正的真实净利润，再返回 `200 OK`。接口当前只确认接收，不保存历史；若要让不同访问者查询最新推送，需要再接入持久化数据库。
 
 ## 本地验证
 

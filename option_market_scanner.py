@@ -1,8 +1,9 @@
-"""Market-wide scanner for exchange-listed options linked to China's A-share market.
+"""Fee-strict box scanner for SSE/SZSE ETF options linked to A shares.
 
-Coverage is intentionally limited to products that actually exist: SSE/SZSE
-ETF options and CFFEX equity-index options.  Mainland exchanges do not list an
-option contract for every individual A-share stock.
+Mainland exchanges do not list an option contract for every individual
+A-share stock.  The execution worker therefore discovers all active ETF option
+contracts published by the local QMT terminal instead of inventing stock
+options or relying on a fixed four-contract fixture.
 """
 
 from __future__ import annotations
@@ -12,7 +13,6 @@ import math
 import os
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -24,6 +24,11 @@ import pandas as pd
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
 _OPTION_CACHE: dict[str, Any] = {}
 
+ETF_OPTION_MULTIPLIER = 10_000
+BOX_LEG_COUNT = 4
+FEE_PER_CONTRACT_CNY = 1.7
+SLIPPAGE_TICK_PER_UNIT = 0.0001
+
 
 class OptionMarketDataUnavailable(RuntimeError):
     """Raised when a complete live option snapshot cannot be obtained."""
@@ -33,25 +38,109 @@ class OptionMarketDataUnavailable(RuntimeError):
 class OptionScanConfig:
     top_n: int = 20
     interest_rate: float = 0.03
-    actionpoint: float = 0.0001
+    # Minimum TRUE net profit in absolute CNY per complete four-leg box.
+    actionpoint: float = 0.0
     desir_mount: int = 1
     min_volume: int = 1
     data_mode: str = "auto"
+    contract_multiplier: int = ETF_OPTION_MULTIPLIER
+    fee_per_contract_cny: float = FEE_PER_CONTRACT_CNY
+    slippage_tick_per_unit: float = SLIPPAGE_TICK_PER_UNIT
 
     def validate(self) -> "OptionScanConfig":
-        if not 5 <= self.top_n <= 50:
-            raise ValueError("输出机会数必须在 5 到 50 之间")
+        if not 1 <= self.top_n <= 500:
+            raise ValueError("输出机会数必须在 1 到 500 之间")
         if not 0 <= self.interest_rate <= 1:
             raise ValueError("无风险利率必须在 0 到 1 之间")
         if not 0 <= self.actionpoint <= 1_000_000:
-            raise ValueError("触发阈值必须为非负数")
+            raise ValueError("最低真实净利润必须为非负人民币金额")
         if not 1 <= self.desir_mount <= 100:
             raise ValueError("模拟数量必须在 1 到 100 之间")
         if not 0 <= self.min_volume <= 10_000_000:
             raise ValueError("最小成交量必须为非负数")
         if self.data_mode not in {"auto", "live", "demo"}:
             raise ValueError("data_mode 仅支持 auto、live 或 demo")
+        if self.contract_multiplier != ETF_OPTION_MULTIPLIER:
+            raise ValueError("本扫描器仅支持合约乘数为 10000 的沪深 ETF 期权")
+        if self.fee_per_contract_cny < 0 or self.slippage_tick_per_unit < 0:
+            raise ValueError("手续费和滑点不得为负")
         return self
+
+    @property
+    def total_fees_cny(self) -> float:
+        return self.fee_per_contract_cny * BOX_LEG_COUNT
+
+    @property
+    def total_slippage_cny(self) -> float:
+        return (
+            self.slippage_tick_per_unit
+            * self.contract_multiplier
+            * BOX_LEG_COUNT
+        )
+
+
+def calculate_true_box_profit_cny(
+    *,
+    call_low_ask: float,
+    put_low_bid: float,
+    put_high_ask: float,
+    call_high_bid: float,
+    low_strike: float,
+    high_strike: float,
+    interest_rate: float,
+    remaining_days: int,
+    contract_multiplier: int = ETF_OPTION_MULTIPLIER,
+    fee_per_contract_cny: float = FEE_PER_CONTRACT_CNY,
+    slippage_tick_per_unit: float = SLIPPAGE_TICK_PER_UNIT,
+) -> dict[str, float]:
+    """Calculate an executable long-box profit without mixing dimensions.
+
+    Quotes and strikes are per ETF unit.  Only after the unit theoretical
+    profit is known do we multiply by 10,000 to obtain absolute CNY, and only
+    then subtract the fixed CNY costs.
+    """
+    quotes = [call_low_ask, put_low_bid, put_high_ask, call_high_bid]
+    if not all(math.isfinite(float(value)) and float(value) > 0 for value in quotes):
+        raise ValueError("all four executable option quotes must be positive")
+    if high_strike <= low_strike:
+        raise ValueError("high_strike must be greater than low_strike")
+    if not 0 <= interest_rate <= 1 or remaining_days < 0:
+        raise ValueError("invalid interest rate or remaining days")
+    if contract_multiplier <= 0 or fee_per_contract_cny < 0 or slippage_tick_per_unit < 0:
+        raise ValueError("invalid multiplier, fee or slippage")
+
+    # Step 1: all four premiums remain in per-unit price units.
+    unit_debit = (
+        float(call_low_ask)
+        - float(put_low_bid)
+        + float(put_high_ask)
+        - float(call_high_bid)
+    )
+    # Step 2: discounted strike width is also a per-unit value.
+    unit_fair_value = (float(high_strike) - float(low_strike)) * math.exp(
+        -float(interest_rate) * int(remaining_days) / 365.0
+    )
+    # Step 3: still per unit; no CNY fixed fees may be subtracted here.
+    unit_theoretical_profit = unit_fair_value - unit_debit
+    # Step 4: convert per-unit profit to absolute CNY for one contract set.
+    absolute_gross_profit_cny = unit_theoretical_profit * int(contract_multiplier)
+    total_fees_cny = float(fee_per_contract_cny) * BOX_LEG_COUNT
+    total_slippage_cny = (
+        float(slippage_tick_per_unit) * int(contract_multiplier) * BOX_LEG_COUNT
+    )
+    # Step 5: fixed fees/slippage are absolute CNY and are deducted only now.
+    true_net_profit_cny = (
+        absolute_gross_profit_cny - total_fees_cny - total_slippage_cny
+    )
+    return {
+        "unit_debit": unit_debit,
+        "unit_fair_value": unit_fair_value,
+        "unit_theoretical_profit": unit_theoretical_profit,
+        "absolute_gross_profit_cny": absolute_gross_profit_cny,
+        "fees_cny": total_fees_cny,
+        "slippage_cny": total_slippage_cny,
+        "true_net_profit_cny": true_net_profit_cny,
+    }
 
 
 @dataclass(frozen=True)
@@ -71,7 +160,7 @@ def _env_flag(name: str, default: bool) -> bool:
 
 
 class OptionMarketDataProvider:
-    """Fetch ETF and equity-index options with bounded concurrent requests."""
+    """Fetch a bounded, read-only SSE/SZSE ETF-option web snapshot."""
 
     def __init__(self, cache_seconds: int | None = None) -> None:
         self.cache_seconds = cache_seconds or int(
@@ -93,7 +182,7 @@ class OptionMarketDataProvider:
             return replace(
                 self._demo_result(),
                 fallback_reason=(
-                    "实时 ETF/股指期权数据不完整，已切换为全市场演示快照"
+                    "实时沪深 ETF 期权数据不完整，已切换为 ETF 演示快照"
                     f"（{type(exc).__name__}）"
                 ),
             )
@@ -106,19 +195,16 @@ class OptionMarketDataProvider:
         ):
             return OptionSnapshot(
                 data=_OPTION_CACHE["data"].copy(),
-                source="东方财富 ETF/股指期权（缓存快照）",
+                source="东方财富沪深 ETF 期权（缓存快照）",
                 fetched_at=str(_OPTION_CACHE["fetched_at"]),
                 is_synthetic=False,
             )
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            etf_future = executor.submit(self._fetch_etf_options)
-            index_future = executor.submit(self._fetch_index_options)
-            etf = etf_future.result()
-            index = index_future.result()
-        if etf.empty or index.empty:
-            raise OptionMarketDataUnavailable("ETF 或股指期权数据为空")
-        frame = pd.concat([etf, index], ignore_index=True)
+        # This executable scanner is deliberately limited to ETF options whose
+        # mandated contract multiplier and fixed-cost model are both 10,000.
+        frame = self._fetch_etf_options()
+        if frame.empty:
+            raise OptionMarketDataUnavailable("沪深 ETF 期权数据为空")
         frame = frame.drop_duplicates("code", keep="first")
         fetched_at = dt.datetime.now(CHINA_TZ).isoformat(timespec="seconds")
         _OPTION_CACHE.update(
@@ -126,7 +212,7 @@ class OptionMarketDataProvider:
         )
         return OptionSnapshot(
             data=frame,
-            source="东方财富 ETF 期权 + 中金所股指期权快照",
+            source="东方财富沪深 ETF 期权实时买卖盘快照",
             fetched_at=fetched_at,
             is_synthetic=False,
         )
@@ -200,55 +286,6 @@ class OptionMarketDataProvider:
             axis=1,
         )
         frame["quote_basis"] = "bid_ask"
-        return cls._finish_normalization(frame)
-
-    @classmethod
-    def _fetch_index_options(cls) -> pd.DataFrame:
-        import requests
-
-        response = requests.get(
-            "https://futsseapi.eastmoney.com/list/option/221",
-            params={
-                "orderBy": "zdf",
-                "sort": "desc",
-                "pageSize": "20000",
-                "pageIndex": "0",
-                "token": "58b2fa8f54638b60b87d69b31969089c",
-                "field": "dm,sc,name,p,vol,cje,ccl,xqj,syr,rz,zjsj,o",
-            },
-            headers={"User-Agent": "Mozilla/5.0 (compatible; QuantConsole/1.0)"},
-            timeout=cls._request_timeout(),
-        )
-        response.raise_for_status()
-        rows = response.json().get("list") or []
-        if not rows:
-            raise OptionMarketDataUnavailable("股指期权接口返回空表")
-        raw = pd.DataFrame(rows)
-        frame = pd.DataFrame(
-            {
-                "raw_code": raw.get("dm"),
-                "code": raw.get("dm").astype(str) + ".CFFEX",
-                "name": raw.get("name"),
-                "exchange": "CFFEX",
-                "last": raw.get("p"),
-                "volume": raw.get("vol"),
-                "amount": raw.get("cje"),
-                "open_interest": raw.get("ccl"),
-                "strike": raw.get("xqj"),
-                "remaining_days": raw.get("syr"),
-            }
-        )
-        codes = frame["raw_code"].astype(str).str.upper()
-        frame = frame[codes.str.match(r"^(IO|MO|HO)\d{4}-[CP]-\d+")].copy()
-        codes = frame["raw_code"].astype(str).str.upper()
-        frame["option_type"] = np.where(codes.str.contains("-C-"), "C", "P")
-        frame["underlying"] = codes.str[:2].map(
-            {"IO": "沪深300股指", "MO": "中证1000股指", "HO": "上证50股指"}
-        )
-        # The compact CFFEX endpoint exposes last price but not executable BBO.
-        frame["bid"] = frame["last"]
-        frame["ask"] = frame["last"]
-        frame["quote_basis"] = "last_proxy"
         return cls._finish_normalization(frame)
 
     @staticmethod
@@ -326,7 +363,7 @@ class OptionMarketDataProvider:
     def _demo_result() -> OptionSnapshot:
         return OptionSnapshot(
             data=generate_demo_option_market(),
-            source="覆盖沪深 ETF 与中金所股指期权的合成演示快照",
+            source="覆盖九个沪深 ETF 期权产品族的合成演示快照",
             fetched_at=dt.datetime.now(CHINA_TZ).isoformat(timespec="seconds"),
             is_synthetic=True,
         )
@@ -350,7 +387,7 @@ def _black_scholes_pair(
 
 
 def generate_demo_option_market(seed: int = 20260806) -> pd.DataFrame:
-    """Generate a broad deterministic market with 12 real product families."""
+    """Generate a deterministic market covering nine ETF option families."""
     rng = np.random.default_rng(seed)
     products = [
         ("50ETF(SSE)", "SSE", 2.85),
@@ -362,9 +399,6 @@ def generate_demo_option_market(seed: int = 20260806) -> pd.DataFrame:
         ("创业板ETF(SZSE)", "SZSE", 2.35),
         ("中证500ETF(SZSE)", "SZSE", 6.10),
         ("深证100ETF(SZSE)", "SZSE", 3.25),
-        ("沪深300股指", "CFFEX", 4100.0),
-        ("中证1000股指", "CFFEX", 6200.0),
-        ("上证50股指", "CFFEX", 2850.0),
     ]
     rows: list[dict[str, Any]] = []
     today = dt.datetime.now(CHINA_TZ).date()
@@ -439,20 +473,26 @@ class MarketWideBoxScanner:
 
     def run(self, snapshot: OptionSnapshot) -> dict[str, Any]:
         frame = self._clean(snapshot.data)
-        opportunities, paired_strikes, group_count = self._scan(frame)
+        all_candidates, paired_strikes, group_count = self._scan(frame)
+        threshold_cny = max(float(self.config.actionpoint), 0.0)
+        # Never expose a non-positive opportunity as actionable output.
+        opportunities = [
+            item
+            for item in all_candidates
+            if item["true_net_profit_cny"] > threshold_cny
+        ]
         opportunities.sort(
-            key=lambda item: (item["profit_bps"], item["min_leg_volume"]),
+            key=lambda item: (item["true_net_profit_cny"], item["min_leg_volume"]),
             reverse=True,
         )
+        for rank, item in enumerate(opportunities, start=1):
+            item["rank"] = rank
         top = opportunities[: self.config.top_n]
-        positive_count = sum(
-            item["profit_per_unit"] >= self.config.actionpoint
-            for item in opportunities
-        )
+        positive_count = len(opportunities)
         best = top[0] if top else None
         executable_best = bool(
             best
-            and best["profit_per_unit"] >= self.config.actionpoint
+            and best["true_net_profit_cny"] > threshold_cny
             and best["quote_basis"] == "bid_ask"
         )
         orders = []
@@ -482,18 +522,24 @@ class MarketWideBoxScanner:
                 "desir_mount": self.config.desir_mount,
                 "min_volume": self.config.min_volume,
                 "top_n": self.config.top_n,
+                "contract_multiplier": self.config.contract_multiplier,
+                "fee_per_contract_cny": self.config.fee_per_contract_cny,
+                "box_leg_count": BOX_LEG_COUNT,
+                "total_fees_cny": self.config.total_fees_cny,
+                "slippage_tick_per_unit": self.config.slippage_tick_per_unit,
+                "total_slippage_cny": self.config.total_slippage_cny,
             },
             "summary": {
                 "contract_count": int(len(frame)),
                 "underlying_count": int(frame["underlying"].nunique()),
                 "expiry_group_count": int(group_count),
                 "paired_strike_count": int(paired_strikes),
-                "box_combination_count": int(len(opportunities)),
+                "box_combination_count": int(len(all_candidates)),
                 "positive_opportunity_count": int(positive_count),
-                "best_profit_per_unit": round(
-                    float(best["profit_per_unit"]), 6
+                "best_true_net_profit_cny": round(
+                    float(best["true_net_profit_cny"]), 2
                 ) if best else None,
-                "best_profit_bps": round(float(best["profit_bps"]), 2)
+                "best_net_profit_bps": round(float(best["net_profit_bps"]), 2)
                 if best
                 else None,
                 "bid_ask_contract_count": int(quote_counts.get("bid_ask", 0)),
@@ -503,12 +549,12 @@ class MarketWideBoxScanner:
             "opportunities": top,
             "orders": orders,
             "methodology": {
-                "coverage": "上交所/深交所 ETF 期权与中金所沪深300、中证1000、上证50股指期权",
+                "coverage": "仅扫描合约乘数为 10000 的上交所/深交所 ETF 期权",
                 "pairing": "同一标的、同一到期日内先按相同行权价配对认购与认沽，再枚举 K_low < K_high",
-                "profit": "PV(K_high-K_low) - [Call_low_ask - Put_low_bid + Put_high_ask - Call_high_bid]",
-                "quote_rule": "仅 bid_ask 行情可形成模拟四腿；last_proxy 只展示理论排序",
-                "market_limit": "中国内地目前不是每只 A 股都有个股期权，覆盖对象是 ETF 与股指期权",
-                "risk_notice": "未计手续费、滑点、保证金、行权交收、合约乘数差异和多腿成交风险，不构成交易指令",
+                "profit": "先算每单位理论利润，再乘 10000 转为人民币，最后扣除 6.8 元手续费与 4.0 元滑点",
+                "quote_rule": "四条腿均使用可执行买一/卖一；缺失真实 BBO 的合约不进入结果",
+                "fee_model": "1.7 元/张/腿 × 4 腿 = 6.8 元/套；0.0001 × 10000 × 4 腿 = 4.0 元/套",
+                "risk_notice": "净利润仍未覆盖四腿不同步成交、撤单、保证金占用、价格跳变及行权交收风险，不构成交易指令",
             },
         }
 
@@ -519,6 +565,10 @@ class MarketWideBoxScanner:
         frame = data.copy()
         for column in ["remaining_days", "strike", "bid", "ask", "volume"]:
             frame[column] = pd.to_numeric(frame[column], errors="coerce")
+        for column in ["bid_volume", "ask_volume"]:
+            if column not in frame:
+                frame[column] = frame["volume"]
+            frame[column] = pd.to_numeric(frame[column], errors="coerce").fillna(0)
         frame["option_type"] = frame["option_type"].astype(str).str.upper()
         frame = frame.dropna(
             subset=[
@@ -533,6 +583,8 @@ class MarketWideBoxScanner:
         )
         frame = frame[
             frame["option_type"].isin(["C", "P"])
+            & frame["exchange"].isin(["SSE", "SZSE"])
+            & (frame["quote_basis"] == "bid_ask")
             & (frame["remaining_days"] > 0)
             & (frame["strike"] > 0)
             & (frame["bid"] > 0)
@@ -555,20 +607,20 @@ class MarketWideBoxScanner:
             group_count += 1
             paired_strikes += len(strikes)
             underlying, exchange, expiry_date, remaining_days = keys
-            discount = math.exp(
-                -self.config.interest_rate * float(remaining_days) / 365.0
-            )
             for low_position, low_strike in enumerate(strikes[:-1]):
                 low_call = call.loc[low_strike]
                 low_put = put.loc[low_strike]
                 for high_strike in strikes[low_position + 1 :]:
                     high_call = call.loc[high_strike]
                     high_put = put.loc[high_strike]
-                    legs_frame = [low_call, low_put, high_put, high_call]
-                    min_volume = min(
-                        int(max(float(row.get("volume", 0) or 0), 0))
-                        for row in legs_frame
-                    )
+                    # Use the executable side's level-1 depth for each leg.
+                    leg_depths = [
+                        float(low_call.get("ask_volume", 0) or 0),
+                        float(low_put.get("bid_volume", 0) or 0),
+                        float(high_put.get("ask_volume", 0) or 0),
+                        float(high_call.get("bid_volume", 0) or 0),
+                    ]
+                    min_volume = min(int(max(value, 0)) for value in leg_depths)
                     if min_volume < self.config.min_volume:
                         continue
                     debit = (
@@ -577,13 +629,26 @@ class MarketWideBoxScanner:
                         + float(high_put["ask"])
                         - float(high_call["bid"])
                     )
-                    fair_value = (float(high_strike) - float(low_strike)) * discount
+                    calculation = calculate_true_box_profit_cny(
+                        call_low_ask=float(low_call["ask"]),
+                        put_low_bid=float(low_put["bid"]),
+                        put_high_ask=float(high_put["ask"]),
+                        call_high_bid=float(high_call["bid"]),
+                        low_strike=float(low_strike),
+                        high_strike=float(high_strike),
+                        interest_rate=self.config.interest_rate,
+                        remaining_days=int(remaining_days),
+                        contract_multiplier=self.config.contract_multiplier,
+                        fee_per_contract_cny=self.config.fee_per_contract_cny,
+                        slippage_tick_per_unit=self.config.slippage_tick_per_unit,
+                    )
+                    fair_value = calculation["unit_fair_value"]
                     if fair_value <= 0:
                         continue
-                    profit = fair_value - debit
+                    leg_rows = (low_call, low_put, high_put, high_call)
                     quote_basis = (
                         "bid_ask"
-                        if all(row["quote_basis"] == "bid_ask" for row in legs_frame)
+                        if all(row["quote_basis"] == "bid_ask" for row in leg_rows)
                         else "last_proxy"
                     )
                     legs = [
@@ -600,30 +665,60 @@ class MarketWideBoxScanner:
                             "remaining_days": int(remaining_days),
                             "low_strike": round(float(low_strike), 4),
                             "high_strike": round(float(high_strike), 4),
+                            "contract_multiplier": self.config.contract_multiplier,
+                            "unit_debit": round(calculation["unit_debit"], 6),
+                            "unit_fair_value": round(calculation["unit_fair_value"], 6),
+                            "unit_theoretical_profit": round(
+                                calculation["unit_theoretical_profit"], 6
+                            ),
+                            "absolute_gross_profit_cny": round(
+                                calculation["absolute_gross_profit_cny"], 2
+                            ),
+                            "fees_cny": round(calculation["fees_cny"], 2),
+                            "slippage_cny": round(calculation["slippage_cny"], 2),
+                            "true_net_profit_cny": round(
+                                calculation["true_net_profit_cny"], 2
+                            ),
+                            "true_net_profit_total_cny": round(
+                                calculation["true_net_profit_cny"]
+                                * self.config.desir_mount,
+                                2,
+                            ),
+                            "net_profit_bps": round(
+                                calculation["true_net_profit_cny"]
+                                / (fair_value * self.config.contract_multiplier)
+                                * 10_000,
+                                2,
+                            ),
+                            # Compatibility aliases for existing web clients.
                             "fair_value": round(fair_value, 6),
                             "net_debit": round(debit, 6),
-                            "profit_per_unit": round(profit, 6),
-                            "profit_bps": round(profit / fair_value * 10_000, 2),
+                            "profit_per_unit": round(
+                                calculation["unit_theoretical_profit"], 6
+                            ),
+                            "profit_bps": round(
+                                calculation["unit_theoretical_profit"]
+                                / fair_value
+                                * 10_000,
+                                2,
+                            ),
                             "min_leg_volume": min_volume,
                             "quote_basis": quote_basis,
                             "legs": legs,
                         }
                     )
-        for rank, item in enumerate(
-            sorted(candidates, key=lambda row: row["profit_bps"], reverse=True),
-            start=1,
-        ):
-            item["rank"] = rank
         return candidates, paired_strikes, group_count
 
     @staticmethod
     def _leg(row: pd.Series, side: str, option: str, price_field: str) -> dict[str, Any]:
+        volume_field = "ask_volume" if price_field == "ask" else "bid_volume"
         return {
             "code": str(row["code"]),
             "name": str(row["name"]),
             "side": side,
             "option_type": option,
             "price": round(float(row[price_field]), 6),
+            "available_volume": int(max(float(row.get(volume_field, 0) or 0), 0)),
         }
 
 
@@ -632,7 +727,7 @@ def run_option_market_scan(
     data_mode: str = "auto",
     top_n: int = 20,
     interest_rate: float = 0.03,
-    actionpoint: float = 0.0001,
+    actionpoint: float = 0.0,
     desir_mount: int = 1,
     min_volume: int = 1,
 ) -> dict[str, Any]:
@@ -649,11 +744,16 @@ def run_option_market_scan(
 
 
 __all__ = [
+    "BOX_LEG_COUNT",
+    "ETF_OPTION_MULTIPLIER",
+    "FEE_PER_CONTRACT_CNY",
     "MarketWideBoxScanner",
     "OptionMarketDataProvider",
     "OptionMarketDataUnavailable",
     "OptionScanConfig",
     "OptionSnapshot",
+    "SLIPPAGE_TICK_PER_UNIT",
+    "calculate_true_box_profit_cny",
     "generate_demo_option_market",
     "run_option_market_scan",
 ]

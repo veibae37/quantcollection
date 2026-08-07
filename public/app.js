@@ -207,12 +207,12 @@ function renderOptions(result) {
       <td>${escapeHtml(item.expiry_date)}</td>
       <td>${formatNumber(item.low_strike, 4)}</td>
       <td>${formatNumber(item.high_strike, 4)}</td>
-      <td>${formatNumber(item.fair_value, 6)}</td>
-      <td>${formatNumber(item.net_debit, 6)}</td>
-      <td class="${item.profit_per_unit >= 0 ? "positive" : "negative"}">${formatSigned(item.profit_per_unit, 6)}</td>
-      <td class="${item.profit_bps >= 0 ? "positive" : "negative"}">${formatSigned(item.profit_bps, 2)} bps</td>
+      <td>${formatNumber(item.unit_fair_value, 6)}</td>
+      <td>${formatNumber(item.unit_debit, 6)}</td>
+      <td class="${item.absolute_gross_profit_cny >= 0 ? "positive" : "negative"}">${formatSigned(item.absolute_gross_profit_cny, 2)}</td>
+      <td>${formatNumber(item.fees_cny + item.slippage_cny, 2)}</td>
+      <td class="${item.true_net_profit_cny > 0 ? "positive" : "negative"}"><strong>${formatSigned(item.true_net_profit_cny, 2)}</strong></td>
       <td>${item.min_leg_volume}</td>
-      <td><span class="board-tag">${item.quote_basis === "bid_ask" ? "买卖一" : "最新价代理"}</span></td>
     </tr>`).join("");
 }
 
@@ -258,9 +258,9 @@ function buildMetrics(result) {
       ["标的族", summary.underlying_count],
       ["配对行权价", summary.paired_strike_count],
       ["盒式组合", summary.box_combination_count],
-      ["正偏差机会", summary.positive_opportunity_count],
-      ["最优单位收益", summary.best_profit_per_unit == null ? "—" : formatSigned(summary.best_profit_per_unit, 6)],
-      ["最优收益偏差", summary.best_profit_bps == null ? "—" : `${formatSigned(summary.best_profit_bps, 2)} bps`],
+      ["真实净利润为正", summary.positive_opportunity_count],
+      ["最优真实净利润", summary.best_true_net_profit_cny == null ? "—" : `${formatSigned(summary.best_true_net_profit_cny, 2)} 元`],
+      ["最优净利润率", summary.best_net_profit_bps == null ? "—" : `${formatSigned(summary.best_net_profit_bps, 2)} bps`],
       ["可用买卖一合约", summary.bid_ask_contract_count],
     ];
   }

@@ -41,12 +41,12 @@ PROGRAMS = [
     },
     {
         "id": "boxoption2",
-        "title": "全市场期权盒式扫描",
+        "title": "沪深 ETF 期权盒式扫描",
         "file": "boxoption2.py",
-        "category": "ETF / 股指期权",
+        "category": "沪深 ETF 期权",
         "status": "ready",
-        "description": "扫描沪深 ETF 期权和中金所股指期权，按标的、到期日和行权价配对后寻找盒式价差。",
-        "notice": "覆盖真实存在的 ETF/股指期权，不连接 MiniQMT；行情为只读快照，多腿结果不是可执行交易指令。",
+        "description": "扫描沪深 ETF 期权，按标的、到期日和行权价配对，并输出严格扣除手续费与滑点后的盒式价差。",
+        "notice": "报价先按每单位计算，再乘 10000 转成人民币，最后扣除每套 6.8 元手续费与 4.0 元滑点；网页结果只读。",
         "parameters": [
             {
                 "name": "data_mode",
@@ -60,10 +60,10 @@ PROGRAMS = [
                 ],
             },
             {"name": "interest_rate", "label": "无风险利率", "type": "number", "value": 0.03, "min": 0, "max": 1, "step": 0.001},
-            {"name": "actionpoint", "label": "触发阈值", "type": "number", "value": 0.0001, "min": 0, "max": 100, "step": 0.0001},
+            {"name": "actionpoint", "label": "最低真实净利润(元)", "type": "number", "value": 0, "min": 0, "max": 1000000, "step": 0.1},
             {"name": "desir_mount", "label": "订单数量", "type": "number", "value": 1, "min": 1, "max": 100, "step": 1},
             {"name": "top_n", "label": "输出机会数", "type": "number", "value": 20, "min": 5, "max": 50, "step": 1},
-            {"name": "min_volume", "label": "四腿最小成交量", "type": "number", "value": 1, "min": 0, "max": 10000000, "step": 1},
+            {"name": "min_volume", "label": "四腿最小买卖一深度", "type": "number", "value": 1, "min": 0, "max": 10000000, "step": 1},
         ],
     },
     {
@@ -212,7 +212,7 @@ def _run_boxoption2(payload: dict[str, Any]) -> dict[str, Any]:
     from boxoption2 import run_demo
 
     interest_rate = _number(payload, "interest_rate", 0.03, 0, 1)
-    actionpoint = _number(payload, "actionpoint", 0.0001, 0, 100)
+    actionpoint = _number(payload, "actionpoint", 0, 0, 1_000_000)
     quantity = int(_number(payload, "desir_mount", 1, 1, 100))
     top_n = int(_number(payload, "top_n", 20, 5, 50))
     min_volume = int(_number(payload, "min_volume", 1, 0, 10_000_000))
