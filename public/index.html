@@ -53,6 +53,14 @@
                 <div class="table-title"><div><h3>全市场盒式价差候选</h3><p id="option-subtitle"></p></div><span>ETF / 股指期权 · 只读快照</span></div>
                 <div class="table-scroll"><table class="selection-table option-table"><thead><tr><th>#</th><th>标的</th><th>交易所</th><th>到期日</th><th>K Low</th><th>K High</th><th>理论现值</th><th>四腿净支出</th><th>单位理论收益</th><th>收益偏差</th><th>最小成交量</th><th>报价口径</th></tr></thead><tbody id="option-body"></tbody></table></div>
               </div>
+              <div id="portfolio-wrap" class="selection-wrap hidden">
+                <div class="table-title"><div><h3>优化组合持仓</h3><p id="portfolio-subtitle"></p></div><span>合成研究数据 · 不构成投资建议</span></div>
+                <div class="table-scroll"><table class="selection-table portfolio-table"><thead><tr><th>#</th><th>资产</th><th>行业</th><th>基准权重</th><th>优化权重</th><th>主动权重</th><th>Alpha 预测</th></tr></thead><tbody id="portfolio-body"></tbody></table></div>
+              </div>
+              <div id="tw-kelly-wrap" class="selection-wrap hidden">
+                <div class="table-title"><div><h3>前 20 标的概率与半凯利仓位</h3><p id="tw-kelly-subtitle"></p></div><span>网页只读 · MiniQMT 本地执行</span></div>
+                <div class="table-scroll"><table class="selection-table tw-kelly-table"><thead><tr><th>仓位序</th><th>代码 / 名称</th><th>模型</th><th>状态</th><th>P(up)</th><th>P(down)</th><th>校准样本</th><th>半凯利</th><th>目标权重</th><th>参考价</th></tr></thead><tbody id="tw-kelly-body"></tbody></table></div>
+              </div>
               <div id="orders-wrap" class="orders-wrap hidden">
                 <div class="table-title"><h3>模拟订单</h3><span>只读 · 不会下单</span></div>
                 <div class="table-scroll"><table><thead><tr><th>合约</th><th>方向</th><th>动作</th><th>数量</th><th>价格</th></tr></thead><tbody id="orders-body"></tbody></table></div>

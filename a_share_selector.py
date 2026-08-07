@@ -102,6 +102,19 @@ def _env_flag(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _exception_summary(exc: BaseException) -> str:
+    """Return the useful leaf exception without leaking request internals."""
+    leaf: BaseException = exc
+    seen: set[int] = set()
+    while leaf.__cause__ is not None and id(leaf) not in seen:
+        seen.add(id(leaf))
+        leaf = leaf.__cause__
+    message = " ".join(str(leaf).split())
+    if len(message) > 240:
+        message = message[:237] + "..."
+    return f"{type(leaf).__name__}: {message}" if message else type(leaf).__name__
+
+
 class AShareDataProvider:
     """Fetch one live market snapshot with a short warm-instance cache."""
 
@@ -120,12 +133,15 @@ class AShareDataProvider:
                 "A_SHARE_ALLOW_SYNTHETIC_FALLBACK", True
             ):
                 raise MarketDataUnavailable(
-                    f"A 股实时行情获取失败：{type(exc).__name__}"
+                    f"A 股实时行情获取失败（{_exception_summary(exc)}）"
                 ) from exc
             demo = self._demo_result()
             return replace(
                 demo,
-                fallback_reason=f"实时数据不可用，已切换为演示数据（{type(exc).__name__}）",
+                fallback_reason=(
+                    "实时数据不可用，已切换为演示数据（"
+                    f"{_exception_summary(exc)}）"
+                ),
             )
 
     def _fetch_live(self) -> SnapshotResult:
@@ -173,38 +189,77 @@ class AShareDataProvider:
 
     @staticmethod
     def _fetch_eastmoney_snapshot() -> pd.DataFrame:
-        """Fetch all A shares in one bounded request for serverless execution."""
+        """Fetch A shares with bounded pages and redundant HTTPS hosts.
+
+        A single 6,000-row response is occasionally closed by the upstream
+        server before headers are returned.  Moderate pages are more reliable
+        and still keep the serverless request count small.
+        """
         import requests
 
         timeout = max(
             3.0,
             min(float(os.environ.get("A_SHARE_HTTP_TIMEOUT_SECONDS", "8")), 15.0),
         )
-        response = requests.get(
-            "https://82.push2.eastmoney.com/api/qt/clist/get",
-            params={
-                "pn": "1",
-                "pz": "6000",
-                "po": "1",
-                "np": "1",
-                "ut": "bd1d9ddb04089700cf9c27f6f7426281",
-                "fltt": "2",
-                "invt": "2",
-                "fid": "f12",
-                "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048",
-                "fields": "f2,f3,f6,f7,f8,f9,f12,f14,f20,f21,f23,f24,f25",
-            },
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; QuantConsole/1.0)",
-                "Accept": "application/json,text/plain,*/*",
-            },
-            timeout=(3.0, timeout),
+        configured_hosts = os.environ.get(
+            "A_SHARE_EASTMONEY_HOSTS",
+            "push2.eastmoney.com,82.push2.eastmoney.com",
         )
-        response.raise_for_status()
-        payload = response.json()
-        rows = (payload.get("data") or {}).get("diff") or []
+        hosts = [item.strip() for item in configured_hosts.split(",") if item.strip()]
+        if not hosts:
+            raise MarketDataUnavailable("A_SHARE_EASTMONEY_HOSTS is empty")
+        page_size = max(
+            200, min(int(os.environ.get("A_SHARE_PAGE_SIZE", "1000")), 2000)
+        )
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json,text/plain,*/*",
+            "Referer": "https://quote.eastmoney.com/",
+            "Connection": "close",
+        }
+        common_params = {
+            "pz": str(page_size),
+            "po": "1",
+            "np": "1",
+            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+            "fltt": "2",
+            "invt": "2",
+            "fid": "f12",
+            "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048",
+            "fields": "f2,f3,f6,f7,f8,f9,f12,f14,f20,f21,f23,f24,f25",
+        }
+        rows: list[dict[str, Any]] = []
+        errors: list[str] = []
+        for host in hosts:
+            candidate_rows: list[dict[str, Any]] = []
+            try:
+                for page in range(1, 10):
+                    response = requests.get(
+                        f"https://{host}/api/qt/clist/get",
+                        params={**common_params, "pn": str(page)},
+                        headers=headers,
+                        timeout=(3.0, timeout),
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                    data = payload.get("data") or {}
+                    page_rows = data.get("diff") or []
+                    if isinstance(page_rows, dict):
+                        page_rows = list(page_rows.values())
+                    if not page_rows:
+                        break
+                    candidate_rows.extend(page_rows)
+                    total = int(data.get("total") or 0)
+                    if len(page_rows) < page_size or (total and len(candidate_rows) >= total):
+                        break
+                if candidate_rows:
+                    rows = candidate_rows
+                    break
+            except Exception as exc:
+                errors.append(f"{host} -> {_exception_summary(exc)}")
         if not rows:
-            raise MarketDataUnavailable("东方财富行情接口返回空表")
+            detail = "; ".join(errors) if errors else "all hosts returned an empty table"
+            raise MarketDataUnavailable(f"东方财富行情接口不可用：{detail}")
         frame = pd.DataFrame(rows).rename(
             columns={
                 "f12": "代码",

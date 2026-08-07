@@ -80,4 +80,33 @@ python -m unittest tests.test_quant_portfolio_system -v
 
 演示仅使用确定性的合成数据，输出完整权重 CSV、处理后因子、Alpha 预测、摘要 JSON 与权重对比图。生产数据必须使用 point-in-time 基本面并处理退市样本，避免前视偏差和幸存者偏差。
 
+## TW 概率森林、半凯利与 MiniQMT
+
+`tw_kelly_strategy.py` 将 `TWrandomf.pine` 的两套九票规则森林、三根 K 线目标、滚动分箱校准及概率 EMA 转换为 Python。它连接 A 股多因子选股前 20 只，并按等赔率二分之一凯利公式计算多头仓位：
+
+```text
+half_kelly = max(0, 0.5 * (P(up) - P(down)))
+```
+
+网页只展示确定性演示行情和模拟调仓单。MiniQMT 必须在安装了交易终端的本地 Windows 主机运行。先复制/编辑项目根目录下被 Git 忽略的 `.env`，填写真实的 `MINIQMT_PATH` 与 `MINIQMT_ACCOUNT_ID`，然后执行默认 dry-run：
+
+```powershell
+python -B miniqmt_kelly_executor.py --selection-data-mode live
+```
+
+提交真实委托需要同时传入 `--live`，并显式设置实盘确认变量：
+
+```powershell
+$env:MINIQMT_ENABLE_LIVE_TRADING="I_UNDERSTAND_LIVE_TRADING"
+python -B miniqmt_kelly_executor.py --selection-data-mode live --live
+```
+
+若东方财富公共快照被网络拦截，dry-run 会改用 MiniQMT 的真实沪深 A 股板块、实时成交额和本地日线，按 60 日动量、低波动、流动性及规模生成备用前 20；不会伪造 PE/PB。该备用模型不会静默用于实盘。审阅 dry-run 后如确需使用，必须同时传入 `--allow-qmt-selection-live` 并设置：
+
+```powershell
+$env:MINIQMT_ENABLE_QMT_SELECTION_LIVE="I_REVIEWED_QMT_MARKET_ONLY_SELECTION"
+```
+
+运行前还需确认 MiniQMT 已登录，且候选股票的日线与 15 分钟历史行情已下载。执行器采用卖单优先、100 股整手、T+1 可卖数量限制和买卖一附近保护限价。Spyder Runtime 若存在 NumPy/SciPy 原生 DLL 问题，优化器会自动切换到满足同一组约束的投影梯度 QP。
+
 项目架构和限制以 Vercel 当前的 [Python Runtime 文档](https://vercel.com/docs/functions/runtimes/python) 为准。

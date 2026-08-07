@@ -1,0 +1,283 @@
+//@version=6
+indicator("Regime Game Probability Forest", shorttitle="Regime Game Forest", overlay=true, max_labels_count=500)
+
+// This is a visual indicator only. It never submits or simulates trades.
+// Pine Script cannot run sklearn RandomForestClassifier.fit() or call an arbitrary HTTP API.
+// The probability below is an auditable decision-forest score built from the same feature families.
+// The ETF basket mode is a signed-turnover proxy, not official ETF subscription/redemption data.
+
+// -----------------------------------------------------------------------------
+// Inputs
+// -----------------------------------------------------------------------------
+
+string GROUP_MODEL = "Model"
+float bullThreshold = input.float(0.60, "Bull game threshold", minval=0.50, maxval=1.00, step=0.01, group=GROUP_MODEL)
+float bearThreshold = input.float(0.40, "Bear game threshold", minval=0.00, maxval=0.50, step=0.01, group=GROUP_MODEL)
+int probabilitySmoothing = input.int(3, "Probability EMA smoothing", minval=1, maxval=20, group=GROUP_MODEL)
+float flowProbabilityShift = input.float(0.08, "Intervention flow probability shift", minval=0.00, maxval=0.30, step=0.01, group=GROUP_MODEL)
+int trainingWindow = input.int(400, "Walk-forward training window", minval=100, maxval=2000, step=20, group=GROUP_MODEL)
+int retrainEveryBars = input.int(20, "Calibration refresh bars", minval=5, maxval=100, group=GROUP_MODEL)
+int minimumBinSamples = input.int(6, "Minimum samples per probability bin", minval=2, maxval=50, group=GROUP_MODEL)
+float calibrationWeight = input.float(0.60, "Walk-forward calibration weight", minval=0.00, maxval=1.00, step=0.05, group=GROUP_MODEL)
+
+string GROUP_REGIME = "National Team Regime"
+string regimeSource = input.string("Manual API values", "Regime source", options=["Manual API values", "ETF basket proxy"], group=GROUP_REGIME)
+float manualNetFlowBn = input.float(0.0, "API net flow, CNY bn", step=0.1, group=GROUP_REGIME)
+float manualBasketAumBn = input.float(1000.0, "API basket AUM, CNY bn", minval=0.0, step=10.0, group=GROUP_REGIME)
+float manualFlowZ = input.float(0.0, "API historical flow z-score", step=0.1, group=GROUP_REGIME)
+bool manualVendorStrong = input.bool(false, "API strong-event flag", group=GROUP_REGIME)
+int manualEffectiveTime = input.time(timestamp("01 Jan 2024 00:00 +0800"), "API value effective from", group=GROUP_REGIME)
+float absoluteFlowThresholdBn = input.float(5.0, "Strong absolute flow, CNY bn", minval=0.0, step=0.5, group=GROUP_REGIME)
+float flowRatioThresholdBps = input.float(20.0, "Strong flow/AUM ratio, bps", minval=0.0, step=1.0, group=GROUP_REGIME)
+float flowZThreshold = input.float(2.0, "Strong flow z-score", minval=0.0, step=0.1, group=GROUP_REGIME)
+
+string GROUP_PROXY = "ETF Basket Proxy"
+string etf1 = input.symbol("SSE:510300", "ETF 1", group=GROUP_PROXY)
+string etf2 = input.symbol("SSE:510050", "ETF 2", group=GROUP_PROXY)
+string etf3 = input.symbol("SSE:510500", "ETF 3", group=GROUP_PROXY)
+string etf4 = input.symbol("SZSE:159919", "ETF 4", group=GROUP_PROXY)
+float proxyZThreshold = input.float(2.0, "Proxy intervention threshold", minval=0.5, step=0.1, group=GROUP_PROXY)
+
+string GROUP_DISPLAY = "Display"
+bool showBarColors = input.bool(true, "Color candles by game state", group=GROUP_DISPLAY)
+bool showRegimeBackground = input.bool(true, "Highlight intervention regime", group=GROUP_DISPLAY)
+bool showTransitionLabels = input.bool(true, "Show probability on state changes", group=GROUP_DISPLAY)
+bool showPeriodicLabels = input.bool(false, "Show periodic probability labels", group=GROUP_DISPLAY)
+int periodicLabelBars = input.int(20, "Periodic label interval", minval=5, maxval=200, group=GROUP_DISPLAY)
+bool confirmedLabelsOnly = input.bool(true, "Labels only after candle close", group=GROUP_DISPLAY)
+bool showDashboard = input.bool(true, "Show dashboard", group=GROUP_DISPLAY)
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+f_vote(bool condition) =>
+    condition ? 1.0 : 0.0
+
+f_safe_z(float value, int length) =>
+    float average = ta.sma(value, length)
+    float deviation = ta.stdev(value, length)
+    na(deviation) or deviation == 0.0 ? 0.0 : (value - average) / deviation
+
+f_clamp_probability(float value) =>
+    math.min(math.max(value, 0.0), 1.0)
+
+// Returned value is yesterday's completed daily signed-turnover z-score.
+// lookahead_on is safe here because the expression explicitly uses [1].
+f_previous_daily_proxy_z() =>
+    float signedTurnover = math.sign(close - close[1]) * close * volume
+    float average = ta.sma(signedTurnover, 60)
+    float deviation = ta.stdev(signedTurnover, 60)
+    float currentZ = na(deviation) or deviation == 0.0 ? 0.0 : (signedTurnover - average) / deviation
+    currentZ[1]
+
+f_direction(float value) =>
+    value > 0.0 ? "INFLOW" : value < 0.0 ? "OUTFLOW" : "FLAT"
+
+// -----------------------------------------------------------------------------
+// National-team regime: manual API values or a market-data-only ETF proxy
+// -----------------------------------------------------------------------------
+
+float proxyZ1 = request.security(etf1, "D", f_previous_daily_proxy_z(), lookahead=barmerge.lookahead_on)
+float proxyZ2 = request.security(etf2, "D", f_previous_daily_proxy_z(), lookahead=barmerge.lookahead_on)
+float proxyZ3 = request.security(etf3, "D", f_previous_daily_proxy_z(), lookahead=barmerge.lookahead_on)
+float proxyZ4 = request.security(etf4, "D", f_previous_daily_proxy_z(), lookahead=barmerge.lookahead_on)
+
+float proxySum = nz(proxyZ1) + nz(proxyZ2) + nz(proxyZ3) + nz(proxyZ4)
+float proxyCount = (na(proxyZ1) ? 0.0 : 1.0) + (na(proxyZ2) ? 0.0 : 1.0) + (na(proxyZ3) ? 0.0 : 1.0) + (na(proxyZ4) ? 0.0 : 1.0)
+float basketProxyZ = proxyCount > 0.0 ? proxySum / proxyCount : 0.0
+
+bool manualValueIsEffective = time >= manualEffectiveTime
+float manualFlowRatioBps = manualBasketAumBn > 0.0 ? manualNetFlowBn / manualBasketAumBn * 10000.0 : 0.0
+bool manualAbsoluteAndZGate = math.abs(manualNetFlowBn) >= absoluteFlowThresholdBn and math.abs(manualFlowZ) >= flowZThreshold
+bool manualRatioGate = math.abs(manualFlowRatioBps) >= flowRatioThresholdBps
+bool manualIntervention = manualValueIsEffective and (manualVendorStrong or manualAbsoluteAndZGate or manualRatioGate)
+bool proxyIntervention = math.abs(basketProxyZ) >= proxyZThreshold
+
+bool useManualRegime = regimeSource == "Manual API values"
+bool interventionRegime = useManualRegime ? manualIntervention : proxyIntervention
+float activeFlowValue = useManualRegime ? manualNetFlowBn : basketProxyZ
+float activeFlowZ = useManualRegime ? manualFlowZ : basketProxyZ
+float activeDirection = math.sign(activeFlowValue)
+string flowDirection = f_direction(activeFlowValue)
+string regimeName = interventionRegime ? "INTERVENTION" : "NORMAL"
+string regimeDataName = useManualRegime ? "API INPUT" : "ETF PROXY"
+
+// -----------------------------------------------------------------------------
+// Feature engineering: same families as the QMT model
+// -----------------------------------------------------------------------------
+
+float rsi14 = ta.rsi(close, 14)
+float atr14 = ta.atr(14)
+float atrPct = close != 0.0 ? atr14 / close : 0.0
+float atrPctAverage = ta.sma(atrPct, 50)
+float momentum10 = ta.mom(close, 10)
+float momentumZ = f_safe_z(momentum10, 60)
+float ema20 = ta.ema(close, 20)
+[macdLine, macdSignal, macdHistogram] = ta.macd(close, 12, 26, 9)
+float macdZ = f_safe_z(macdLine, 60)
+float return1 = close[1] != 0.0 ? close / close[1] - 1.0 : 0.0
+float return3 = close[3] != 0.0 ? close / close[3] - 1.0 : 0.0
+float realizedVolatility10 = ta.stdev(return1, 10)
+float volatilityAverage = ta.sma(realizedVolatility10, 50)
+float bbMiddle = ta.sma(close, 20)
+float bbDeviation = ta.stdev(close, 20)
+float bbZ = na(bbDeviation) or bbDeviation == 0.0 ? 0.0 : (close - bbMiddle) / bbDeviation
+float candleRange = math.max(high - low, syminfo.mintick)
+float lowerWickRatio = (math.min(open, close) - low) / candleRange
+
+// -----------------------------------------------------------------------------
+// NORMAL regime forest: momentum-sensitive model
+// Each condition acts as one transparent decision tree vote.
+// -----------------------------------------------------------------------------
+
+float momentumVotes =
+     f_vote(momentumZ > 0.0) +
+     f_vote(rsi14 > 50.0) +
+     f_vote(macdLine > macdSignal) +
+     f_vote(macdHistogram > 0.0) +
+     f_vote(close > ema20) +
+     f_vote(momentumZ > 0.50 and rsi14 < 70.0) +
+     f_vote(macdZ > 0.0 and atrPct < atrPctAverage * 1.50) +
+     f_vote(return3 > 0.0 and macdHistogram > macdHistogram[1]) +
+     f_vote(close > bbMiddle and momentum10 > 0.0)
+
+float momentumProbability = momentumVotes / 9.0
+
+// -----------------------------------------------------------------------------
+// INTERVENTION regime forest: reversal and volatility-sensitive model
+// Strong inflow raises rebound probability; strong outflow lowers it.
+// -----------------------------------------------------------------------------
+
+float reversalVotes =
+     f_vote(rsi14 < 35.0) +
+     f_vote(bbZ < -1.0) +
+     f_vote(return1 < -atrPct) +
+     f_vote(return3 < -1.50 * atrPct) +
+     f_vote(lowerWickRatio > 0.40) +
+     f_vote(close > close[1] and low < low[1]) +
+     f_vote(realizedVolatility10 > volatilityAverage and rsi14 < 45.0) +
+     f_vote(bbZ < 0.0 and bbZ > bbZ[1]) +
+     f_vote(rsi14 < 45.0 and rsi14 > rsi14[1])
+
+float reversalProbabilityBase = reversalVotes / 9.0
+float reversalProbability = f_clamp_probability(reversalProbabilityBase + activeDirection * flowProbabilityShift)
+float rawUpProbability = interventionRegime ? reversalProbability : momentumProbability
+
+// -----------------------------------------------------------------------------
+// Walk-forward calibration using the original three-bar target
+// At bar t, only the sample from t-3 becomes known:
+// y(t-3) = 1 when close(t) > close(t-3), otherwise 0.
+// Calibration tables are refreshed every 20 bars by default.
+// -----------------------------------------------------------------------------
+
+int CALIBRATION_BINS = 10
+int MODEL_COUNT = 2
+int CALIBRATION_CELLS = CALIBRATION_BINS * MODEL_COUNT
+var float[] outcomeSums = array.new_float(CALIBRATION_CELLS, 0.0)
+var float[] outcomeCounts = array.new_float(CALIBRATION_CELLS, 0.0)
+var float[] calibratedProbabilities = array.new_float(CALIBRATION_CELLS, 0.5)
+var int[] rollingCellKeys = array.new_int(0)
+var float[] rollingOutcomes = array.new_float(0)
+
+float momentumDeviation = ta.stdev(momentum10, 60)
+bool featuresReady = not na(rsi14) and not na(atrPctAverage) and not na(momentumDeviation) and not na(realizedVolatility10)
+
+if barstate.isconfirmed and bar_index >= 3 and featuresReady[3] and not na(rawUpProbability[3])
+    int maturedBin = int(math.min(math.floor(rawUpProbability[3] * CALIBRATION_BINS), CALIBRATION_BINS - 1))
+    int maturedModelOffset = interventionRegime[3] ? CALIBRATION_BINS : 0
+    int maturedCell = maturedModelOffset + maturedBin
+    float maturedOutcome = close > close[3] ? 1.0 : 0.0
+    array.set(outcomeSums, maturedCell, array.get(outcomeSums, maturedCell) + maturedOutcome)
+    array.set(outcomeCounts, maturedCell, array.get(outcomeCounts, maturedCell) + 1.0)
+    array.push(rollingCellKeys, maturedCell)
+    array.push(rollingOutcomes, maturedOutcome)
+    if array.size(rollingCellKeys) > trainingWindow
+        int expiredCell = array.shift(rollingCellKeys)
+        float expiredOutcome = array.shift(rollingOutcomes)
+        array.set(outcomeSums, expiredCell, array.get(outcomeSums, expiredCell) - expiredOutcome)
+        array.set(outcomeCounts, expiredCell, math.max(array.get(outcomeCounts, expiredCell) - 1.0, 0.0))
+
+if barstate.isconfirmed and bar_index % retrainEveryBars == 0
+    for cell = 0 to CALIBRATION_CELLS - 1
+        float cellWins = array.get(outcomeSums, cell)
+        float cellSamples = array.get(outcomeCounts, cell)
+        float binCenter = (cell % CALIBRATION_BINS + 0.5) / CALIBRATION_BINS
+        float fittedProbability = cellSamples >= minimumBinSamples ? (cellWins + 1.0) / (cellSamples + 2.0) : binCenter
+        array.set(calibratedProbabilities, cell, fittedProbability)
+
+int currentBin = int(math.min(math.floor(rawUpProbability * CALIBRATION_BINS), CALIBRATION_BINS - 1))
+int currentModelOffset = interventionRegime ? CALIBRATION_BINS : 0
+int currentCell = currentModelOffset + currentBin
+float currentCellSamples = array.get(outcomeCounts, currentCell)
+float calibratedProbability = array.get(calibratedProbabilities, currentCell)
+float blendedProbability = currentCellSamples >= minimumBinSamples ? rawUpProbability * (1.0 - calibrationWeight) + calibratedProbability * calibrationWeight : rawUpProbability
+float upProbability = f_clamp_probability(ta.ema(blendedProbability, probabilitySmoothing))
+float downProbability = 1.0 - upProbability
+
+// -----------------------------------------------------------------------------
+// Game state and on-chart display
+// -----------------------------------------------------------------------------
+
+bool bullGame = upProbability >= bullThreshold
+bool bearGame = upProbability <= bearThreshold
+bool neutralGame = not bullGame and not bearGame
+string gameName = bullGame ? "BULL GAME" : bearGame ? "BEAR GAME" : "WAIT"
+string modelName = interventionRegime ? "REVERSAL_VOL" : "MOMENTUM"
+
+color gameColor = bullGame ? color.rgb(0, 170, 90) : bearGame ? color.rgb(220, 55, 55) : color.rgb(130, 130, 130)
+barcolor(showBarColors ? gameColor : na, title="Game state candle color")
+bgcolor(showRegimeBackground and interventionRegime ? color.new(color.orange, 88) : na, title="Intervention regime background")
+
+bool bullTransition = bullGame and not bullGame[1]
+bool bearTransition = bearGame and not bearGame[1]
+bool waitTransition = neutralGame and not neutralGame[1]
+bool periodicLabel = showPeriodicLabels and bar_index % periodicLabelBars == 0
+bool labelBarAllowed = not confirmedLabelsOnly or barstate.isconfirmed
+bool shouldDrawLabel = labelBarAllowed and (periodicLabel or (showTransitionLabels and (bullTransition or bearTransition or waitTransition)))
+
+if shouldDrawLabel
+    string labelText = gameName + "\nP(up) " + str.tostring(upProbability * 100.0, "#.0") + "%\n" + modelName
+    float labelY = bearGame ? high + atr14 * 0.25 : low - atr14 * 0.25
+    string labelStyle = bearGame ? label.style_label_down : label.style_label_up
+    label.new(bar_index, labelY, labelText, yloc=yloc.price, style=labelStyle, color=gameColor, textcolor=color.white, size=size.tiny)
+
+// Data-window values do not distort the instrument's price scale.
+plot(upProbability * 100.0, "Up probability (%)", color=color.new(color.green, 100), display=display.data_window)
+plot(downProbability * 100.0, "Down probability (%)", color=color.new(color.red, 100), display=display.data_window)
+plot(interventionRegime ? 1.0 : 0.0, "Intervention regime", color=color.new(color.orange, 100), display=display.data_window)
+plot(activeFlowZ, "Active flow z-score", color=color.new(color.blue, 100), display=display.data_window)
+
+// -----------------------------------------------------------------------------
+// Dashboard
+// -----------------------------------------------------------------------------
+
+var table dashboard = table.new(position.top_right, 2, 10, border_width=1, frame_color=color.new(color.white, 60), border_color=color.new(color.white, 80))
+bool isFifteenMinuteChart = timeframe.isminutes and timeframe.multiplier == 15
+
+if barstate.islast and showDashboard
+    color regimeColor = interventionRegime ? color.rgb(230, 125, 30) : color.rgb(50, 110, 190)
+    color chartColor = isFifteenMinuteChart ? color.rgb(0, 150, 90) : color.rgb(210, 90, 35)
+    table.cell(dashboard, 0, 0, "REGIME GAME", text_color=color.white, bgcolor=color.rgb(30, 30, 35))
+    table.cell(dashboard, 1, 0, "15m VISUAL", text_color=color.white, bgcolor=color.rgb(30, 30, 35))
+    table.cell(dashboard, 0, 1, "Regime", text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(dashboard, 1, 1, regimeName, text_color=color.white, bgcolor=regimeColor)
+    table.cell(dashboard, 0, 2, "Model", text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(dashboard, 1, 2, modelName, text_color=color.white, bgcolor=color.new(regimeColor, 25))
+    table.cell(dashboard, 0, 3, "Game", text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(dashboard, 1, 3, gameName, text_color=color.white, bgcolor=gameColor)
+    table.cell(dashboard, 0, 4, "P(up)", text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(dashboard, 1, 4, str.tostring(upProbability * 100.0, "#.0") + "%", text_color=color.white, bgcolor=color.new(color.green, 45))
+    table.cell(dashboard, 0, 5, "P(down)", text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(dashboard, 1, 5, str.tostring(downProbability * 100.0, "#.0") + "%", text_color=color.white, bgcolor=color.new(color.red, 45))
+    table.cell(dashboard, 0, 6, "Flow", text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(dashboard, 1, 6, flowDirection, text_color=color.white, bgcolor=color.new(regimeColor, 40))
+    table.cell(dashboard, 0, 7, "Source / Z", text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(dashboard, 1, 7, regimeDataName + " / " + str.tostring(activeFlowZ, "#.00"), text_color=color.white, bgcolor=color.new(regimeColor, 40))
+    table.cell(dashboard, 0, 8, "Chart", text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(dashboard, 1, 8, isFifteenMinuteChart ? "15m OK" : "USE 15m", text_color=color.white, bgcolor=chartColor)
+    table.cell(dashboard, 0, 9, "Train samples", text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(dashboard, 1, 9, str.tostring(array.size(rollingCellKeys)) + " / " + str.tostring(trainingWindow), text_color=color.white, bgcolor=color.new(color.purple, 40))
+
+if barstate.islast and not showDashboard
+    table.clear(dashboard, 0, 0, 1, 9)

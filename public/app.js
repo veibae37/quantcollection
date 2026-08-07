@@ -104,6 +104,8 @@ function renderResult(result, durationMs) {
   renderSource(result);
   renderSelections(result);
   renderOptions(result);
+  renderPortfolio(result);
+  renderTwKelly(result);
   renderOrders(result);
   renderMethodology(result);
   $("#json-output").textContent = JSON.stringify(result, null, 2);
@@ -112,7 +114,7 @@ function renderResult(result, durationMs) {
 
 function renderSource(result) {
   const banner = $("#source-banner");
-  if (!["a_share_selection", "option_market_scan"].includes(result.mode)) {
+  if (!["a_share_selection", "option_market_scan", "portfolio_optimization", "tw_kelly_rebalance"].includes(result.mode)) {
     banner.className = "source-banner hidden";
     banner.textContent = "";
     return;
@@ -121,6 +123,49 @@ function renderSource(result) {
   const fallback = result.fallback_reason ? ` · ${result.fallback_reason}` : "";
   banner.className = `source-banner ${result.is_synthetic ? "synthetic" : "live-source"}`;
   banner.innerHTML = `<strong>${escapeHtml(mode)}</strong><span>${escapeHtml(result.source)} · 数据时间 ${escapeHtml(result.data_as_of)}${escapeHtml(fallback)}</span>`;
+}
+
+function renderPortfolio(result) {
+  const portfolio = result.mode === "portfolio_optimization" && Array.isArray(result.portfolio) ? result.portfolio : [];
+  $("#portfolio-wrap").classList.toggle("hidden", portfolio.length === 0);
+  if (!portfolio.length) {
+    $("#portfolio-body").innerHTML = "";
+    return;
+  }
+  $("#portfolio-subtitle").textContent = `${result.summary.asset_count} 个资产中展示优化权重最高的 ${portfolio.length} 个`;
+  $("#portfolio-body").innerHTML = portfolio.map((item) => `
+    <tr>
+      <td class="rank">${item.rank}</td>
+      <td><strong>${escapeHtml(item.asset)}</strong></td>
+      <td><span class="board-tag">${escapeHtml(item.industry)}</span></td>
+      <td>${formatNumber(item.benchmark_weight_pct, 4)}%</td>
+      <td><strong>${formatNumber(item.portfolio_weight_pct, 4)}%</strong></td>
+      <td class="${item.active_weight_pct >= 0 ? "positive" : "negative"}">${formatSigned(item.active_weight_pct, 4)}%</td>
+      <td class="${item.alpha_forecast_pct >= 0 ? "positive" : "negative"}">${formatSigned(item.alpha_forecast_pct, 5)}%</td>
+    </tr>`).join("");
+}
+
+function renderTwKelly(result) {
+  const portfolio = result.mode === "tw_kelly_rebalance" && Array.isArray(result.portfolio) ? result.portfolio : [];
+  $("#tw-kelly-wrap").classList.toggle("hidden", portfolio.length === 0);
+  if (!portfolio.length) {
+    $("#tw-kelly-body").innerHTML = "";
+    return;
+  }
+  $("#tw-kelly-subtitle").textContent = `${portfolio.length} 只标的 · 多头信号 ${result.summary.bull_count} 只 · 目标总仓位 ${formatNumber(result.summary.target_gross_exposure_pct, 2)}%`;
+  $("#tw-kelly-body").innerHTML = portfolio.map((item) => `
+    <tr>
+      <td class="rank">${item.position_rank}</td>
+      <td><strong>${escapeHtml(item.ticker)}</strong><small>${escapeHtml(item.name)}</small></td>
+      <td><span class="board-tag">${escapeHtml(item.model)}</span></td>
+      <td><span class="board-tag">${escapeHtml(item.game)}</span></td>
+      <td class="positive">${formatNumber(item.up_probability * 100, 2)}%</td>
+      <td class="negative">${formatNumber(item.down_probability * 100, 2)}%</td>
+      <td>${item.calibration_samples}</td>
+      <td>${formatNumber(item.half_kelly_fraction * 100, 3)}%</td>
+      <td><strong>${formatNumber(item.target_weight_pct, 4)}%</strong></td>
+      <td>${formatNumber(item.latest_price, 3)}</td>
+    </tr>`).join("");
 }
 
 function renderSelections(result) {
@@ -174,7 +219,13 @@ function renderOptions(result) {
 function renderOrders(result) {
   const orders = Array.isArray(result.orders) ? result.orders : [];
   $("#orders-wrap").classList.toggle("hidden", orders.length === 0);
-  $("#orders-body").innerHTML = orders.map((order) => `<tr><td>${escapeHtml(order.code)}</td><td class="trade-side ${escapeHtml(order.side)}">${order.side === "buy" ? "买入" : "卖出"}</td><td>${order.action === "open" ? "开仓" : "平仓"}</td><td>${escapeHtml(order.qty)}</td><td>${formatNumber(order.price, 4)}</td></tr>`).join("");
+  $("#orders-body").innerHTML = orders.map((order) => {
+    const code = order.code ?? order.ticker;
+    const quantity = order.qty ?? order.quantity;
+    const price = order.price ?? order.reference_price;
+    const action = order.action ? (order.action === "open" ? "开仓" : "平仓") : "调仓";
+    return `<tr><td>${escapeHtml(code)}</td><td class="trade-side ${escapeHtml(order.side)}">${order.side === "buy" ? "买入" : "卖出"}</td><td>${action}</td><td>${escapeHtml(quantity)}</td><td>${formatNumber(price, 4)}</td></tr>`;
+  }).join("");
 }
 
 function renderMethodology(result) {
@@ -213,6 +264,34 @@ function buildMetrics(result) {
       ["可用买卖一合约", summary.bid_ask_contract_count],
     ];
   }
+  if (result.mode === "portfolio_optimization") {
+    const summary = result.summary;
+    return [
+      ["资产数量", summary.asset_count],
+      ["展示持仓", summary.displayed_holding_count],
+      ["预期主动收益", `${formatSigned(summary.expected_active_return * 100, 4)}%`],
+      ["主动风险", `${formatNumber(summary.active_risk * 100, 4)}%`],
+      ["优化后 IR", formatNumber(summary.optimized_information_ratio, 4)],
+      ["基本定律 IR", formatNumber(summary.forecast_fundamental_law_ir, 4)],
+      ["有效 IC", formatNumber(summary.effective_ic, 4)],
+      ["换手率", `${formatNumber(summary.turnover * 100, 2)}%`],
+      ["最大权重", `${formatNumber(summary.max_weight * 100, 2)}%`],
+    ];
+  }
+  if (result.mode === "tw_kelly_rebalance") {
+    const summary = result.summary;
+    return [
+      ["选股数量", summary.selected_count],
+      ["多头信号", summary.bull_count],
+      ["等待信号", summary.wait_count],
+      ["空头信号", summary.bear_count],
+      ["目标总仓位", `${formatNumber(summary.target_gross_exposure_pct, 2)}%`],
+      ["目标现金", `${formatNumber(summary.target_cash_pct, 2)}%`],
+      ["调仓单数", summary.proposed_order_count],
+      ["模拟总资产", `¥${formatNumber(summary.total_asset, 0)}`],
+      ["仓位方法", "二分之一凯利"],
+    ];
+  }
   if (result.mode === "demo") return [["套利机会", result.has_opportunity ? "满足条件" : "未触发"], ["盒式收益", result.box_profit == null ? "—" : formatNumber(result.box_profit, 6)], ["模拟订单", result.orders.length], ["利率", `${formatNumber(result.input.interest_rate * 100, 2)}%`], ["触发阈值", result.input.actionpoint], ["数据来源", "内置模拟盘口"]];
   if (result.mode === "market_data") return [["状态", result.regime], ["方向", result.direction], ["代理流入", `${formatNumber(result.total_net_flow_cny / 1e8, 2)} 亿元`], ["规模占比", `${formatNumber(result.flow_ratio_bps, 2)} bps`], ["强度分数", formatNumber(result.strength_score, 2)], ["ETF 数量", result.etf_count]];
   return Object.entries(result.summary || {}).slice(0, 9).map(([key, value]) => [key.replaceAll("_", " "), value]);
@@ -226,6 +305,8 @@ function renderError(message) {
   $("#source-banner").className = "source-banner hidden";
   $("#selection-wrap").classList.add("hidden");
   $("#option-wrap").classList.add("hidden");
+  $("#portfolio-wrap").classList.add("hidden");
+  $("#tw-kelly-wrap").classList.add("hidden");
   $("#orders-wrap").classList.add("hidden");
   $("#methodology-wrap").classList.add("hidden");
   $("#json-output").textContent = JSON.stringify({ error: message }, null, 2);

@@ -87,6 +87,8 @@ h1 span { color: #78837f; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .selection-table { min-width: 1040px; }
 .option-table { min-width: 1180px; }
+.portfolio-table { min-width: 820px; }
+.tw-kelly-table { min-width: 1120px; }
 th { padding: 11px 12px; text-align: left; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line); }
 td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,.055); font-variant-numeric: tabular-nums; }
 td small { display: block; margin-top: 5px; color: var(--muted); white-space: nowrap; }

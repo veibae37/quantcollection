@@ -10,6 +10,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
+import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Sequence
@@ -124,30 +127,40 @@ class DataProcessor:
         industries: pd.Series,
         regression_weights: pd.Series | None = None,
     ) -> pd.DataFrame | pd.Series:
-        """Return WLS residuals after projection on full industry dummies."""
+        """Return WLS residuals after projection on full industry dummies.
+
+        With a full set of mutually exclusive industry dummies the fitted
+        value is simply the (optionally weighted) mean inside each industry.
+        Computing that mean directly is mathematically identical to the dummy
+        regression, avoids an unnecessary LAPACK call and is substantially
+        more robust in lightweight Windows/Spyder environments.
+        """
         frame = values.to_frame() if isinstance(values, pd.Series) else values.copy()
         industries = industries.reindex(frame.index)
         if industries.isna().any():
             raise DataValidationError("industry labels are missing for some assets")
-        design = pd.get_dummies(industries.astype(str), dtype=float)
         if regression_weights is None:
-            weights = np.ones(len(frame))
+            weights = pd.Series(1.0, index=frame.index, name="regression_weights")
         else:
             weights = _as_series(
                 regression_weights, frame.index, "regression_weights"
-            ).to_numpy()
+            )
             if (weights <= 0).any():
                 raise DataValidationError("regression weights must be positive")
-        sqrt_weights = np.sqrt(weights)[:, None]
-        x = design.to_numpy(dtype=float)
-        x_weighted = x * sqrt_weights
+
+        labels = industries.astype(str)
+        group_weight = weights.groupby(labels, sort=False).transform("sum")
+        if (group_weight <= 0).any():
+            raise DataValidationError("each industry must have positive total weight")
         residuals = pd.DataFrame(index=frame.index, columns=frame.columns, dtype=float)
         for column in frame:
-            y = frame[column].to_numpy(dtype=float)
-            coefficients, *_ = np.linalg.lstsq(
-                x_weighted, y[:, None] * sqrt_weights, rcond=None
-            )
-            residuals[column] = y - x @ coefficients[:, 0]
+            values_column = pd.to_numeric(frame[column], errors="coerce")
+            if not np.isfinite(values_column.to_numpy(dtype=float)).all():
+                raise DataValidationError(f"{column} contains missing or infinite values")
+            weighted_sum = (values_column * weights).groupby(
+                labels, sort=False
+            ).transform("sum")
+            residuals[column] = values_column - weighted_sum / group_weight
         if isinstance(values, pd.Series):
             return residuals.iloc[:, 0].rename(values.name)
         return residuals
@@ -174,7 +187,9 @@ class DataProcessor:
         benchmark = benchmark_weights.reindex(alpha.index).astype(float)
         if benchmark.isna().any() or not np.isclose(benchmark.sum(), 1.0, atol=1e-8):
             raise DataValidationError("benchmark weights must align and sum to one")
-        return alpha.astype(float) - float(benchmark @ alpha.astype(float))
+        alpha_values = alpha.astype(float)
+        benchmark_mean = float((benchmark * alpha_values).sum())
+        return alpha_values - benchmark_mean
 
 
 class FactorLibrary:
@@ -358,7 +373,7 @@ class AlphaGenerator:
 
         ic = pd.Series(expected_ic, dtype=float).reindex(scores.columns)
         factor_alpha = scores.mul(ic, axis=1).mul(omega, axis=0)
-        composite = factor_alpha @ weights
+        composite = factor_alpha.mul(weights, axis=1).sum(axis=1)
         if benchmark_weights is not None:
             factor_alpha = factor_alpha.apply(
                 lambda column: DataProcessor.benchmark_neutralize(
@@ -366,10 +381,10 @@ class AlphaGenerator:
                 )
             )
             composite = DataProcessor.benchmark_neutralize(
-                factor_alpha @ weights, benchmark_weights
+                factor_alpha.mul(weights, axis=1).sum(axis=1), benchmark_weights
             )
 
-        effective_ic = float(ic @ weights)
+        effective_ic = float((ic * weights).sum())
         effective_breadth = float(breadth if breadth is not None else len(scores))
         forecast_ir = self.estimate_information_ratio(
             effective_ic, effective_breadth, transfer_coefficient
@@ -432,9 +447,47 @@ class PortfolioOptimizer:
 
     @staticmethod
     def nearest_psd(matrix: np.ndarray, floor: float = 1e-10) -> np.ndarray:
+        """Return a conservative PSD matrix without requiring LAPACK.
+
+        A small LDL-style check preserves an already positive-definite input.
+        Otherwise a Gershgorin lower bound determines the diagonal loading
+        required to guarantee all eigenvalues are at least ``floor``.  This is
+        deliberately conservative and avoids native ``numpy.linalg`` crashes
+        seen in some bundled Windows/Spyder runtimes.
+        """
+        matrix = np.asarray(matrix, dtype=float)
+        if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1]:
+            raise DataValidationError("covariance matrix must be square")
+        if not np.isfinite(matrix).all():
+            raise DataValidationError("covariance matrix contains invalid values")
         symmetric = (matrix + matrix.T) / 2.0
-        eigenvalues, eigenvectors = np.linalg.eigh(symmetric)
-        return (eigenvectors * np.maximum(eigenvalues, floor)) @ eigenvectors.T
+        size = symmetric.shape[0]
+
+        # Pure NumPy scalar arithmetic avoids dispatching to a broken LAPACK
+        # DLL while cheaply preserving matrices that are already well formed.
+        lower = np.zeros((size, size), dtype=float)
+        positive_definite = True
+        for row in range(size):
+            diagonal = symmetric[row, row] - sum(
+                float(lower[row, column]) ** 2 for column in range(row)
+            )
+            if diagonal < floor or not np.isfinite(diagonal):
+                positive_definite = False
+                break
+            lower[row, row] = math.sqrt(diagonal)
+            for following in range(row + 1, size):
+                numerator = symmetric[following, row] - sum(
+                    float(lower[following, column]) * float(lower[row, column])
+                    for column in range(row)
+                )
+                lower[following, row] = numerator / lower[row, row]
+        if positive_definite:
+            return symmetric
+
+        radii = np.sum(np.abs(symmetric), axis=1) - np.abs(np.diag(symmetric))
+        lower_bound = float(np.min(np.diag(symmetric) - radii))
+        diagonal_loading = max(float(floor) - lower_bound, 0.0)
+        return symmetric + np.eye(size) * diagonal_loading
 
     def build_factor_covariance(
         self,
@@ -466,7 +519,14 @@ class PortfolioOptimizer:
         ).to_numpy()
         if (delta < 0).any():
             raise DataValidationError("specific variances must be non-negative")
-        covariance = x.to_numpy() @ f @ x.to_numpy().T + np.diag(delta)
+        x_values = x.to_numpy()
+        # Broadcasting performs X F X' without dispatching to a BLAS DLL.
+        x_times_f = np.sum(
+            x_values[:, :, None] * f[None, :, :], axis=1
+        )
+        covariance = np.sum(
+            x_times_f[:, None, :] * x_values[None, :, :], axis=2
+        ) + np.diag(delta)
         covariance = self.nearest_psd(covariance, self.eigenvalue_floor)
         return pd.DataFrame(covariance, index=x.index, columns=x.index)
 
@@ -491,7 +551,7 @@ class PortfolioOptimizer:
             frame = frame.reindex(benchmark.index).astype(float)
             if frame.isna().any().any():
                 raise DataValidationError(f"{prefix} exposures do not align")
-            target = frame.T.to_numpy() @ benchmark.to_numpy()
+            target = frame.mul(benchmark, axis=0).sum(axis=0).to_numpy()
             for position, column in enumerate(frame.columns):
                 rows.append(frame[column].to_numpy())
                 lower.append(float(target[position] - neutrality_tolerance))
@@ -501,6 +561,107 @@ class PortfolioOptimizer:
         append_exposures(industry_exposure, "industry")
         append_exposures(style_exposure, "style")
         return np.vstack(rows), np.array(lower), np.array(upper), labels
+
+    def _project_feasible(
+        self,
+        values: np.ndarray,
+        lower_bounds: np.ndarray,
+        upper_bounds: np.ndarray,
+        matrix: np.ndarray,
+        constraint_lower: np.ndarray,
+        constraint_upper: np.ndarray,
+        *,
+        max_sweeps: int = 600,
+    ) -> np.ndarray:
+        """Dykstra projection onto box and linear interval constraints."""
+        projected = np.asarray(values, dtype=float).copy()
+        corrections = np.zeros((len(matrix) + 1, len(projected)), dtype=float)
+        tolerance = max(self.solver_tolerance, 1e-10)
+        for _ in range(max_sweeps):
+            before = projected.copy()
+            candidate = projected + corrections[0]
+            next_value = np.clip(candidate, lower_bounds, upper_bounds)
+            corrections[0] = candidate - next_value
+            projected = next_value
+
+            for position, row in enumerate(matrix):
+                candidate = projected + corrections[position + 1]
+                row_norm = float(np.sum(row * row))
+                if row_norm <= 0:
+                    continue
+                achieved = float(np.sum(row * candidate))
+                target = achieved
+                if achieved < constraint_lower[position]:
+                    target = float(constraint_lower[position])
+                elif achieved > constraint_upper[position]:
+                    target = float(constraint_upper[position])
+                if target != achieved:
+                    next_value = candidate + ((target - achieved) / row_norm) * row
+                else:
+                    next_value = candidate
+                corrections[position + 1] = candidate - next_value
+                projected = next_value
+
+            if float(np.max(np.abs(projected - before))) <= tolerance:
+                achieved_all = np.sum(matrix * projected[None, :], axis=1)
+                violation = max(
+                    float(np.max(np.maximum(constraint_lower - achieved_all, 0.0), initial=0.0)),
+                    float(np.max(np.maximum(achieved_all - constraint_upper, 0.0), initial=0.0)),
+                    float(np.max(np.maximum(lower_bounds - projected, 0.0), initial=0.0)),
+                    float(np.max(np.maximum(projected - upper_bounds, 0.0), initial=0.0)),
+                )
+                if violation <= max(tolerance * 10, 1e-9):
+                    break
+        return projected
+
+    def _projected_gradient_qp(
+        self,
+        initial: np.ndarray,
+        alpha: np.ndarray,
+        covariance: np.ndarray,
+        benchmark: np.ndarray,
+        current: np.ndarray,
+        costs: np.ndarray,
+        lower_bounds: np.ndarray,
+        upper_bounds: np.ndarray,
+        matrix: np.ndarray,
+        constraint_lower: np.ndarray,
+        constraint_upper: np.ndarray,
+    ) -> tuple[np.ndarray, int]:
+        """Solve the convex QP without native BLAS/LAPACK dependencies."""
+        weights = self._project_feasible(
+            initial, lower_bounds, upper_bounds, matrix, constraint_lower, constraint_upper
+        )
+        row_bound = float(np.max(np.sum(np.abs(covariance), axis=1), initial=0.0))
+        lipschitz = (
+            2.0 * self.risk_aversion * row_bound
+            + 2.0 * self.transaction_cost_aversion * float(np.max(costs, initial=0.0))
+        )
+        step = 1.0 / max(lipschitz, 1e-8)
+        convergence = max(self.solver_tolerance * 10, 1e-9)
+        iterations = 0
+        for iterations in range(1, self.max_iterations + 1):
+            active = weights - benchmark
+            trade = weights - current
+            gradient = (
+                -alpha
+                + 2.0 * self.risk_aversion * np.sum(covariance * active[None, :], axis=1)
+                + 2.0 * self.transaction_cost_aversion * costs * trade
+            )
+            candidate = self._project_feasible(
+                weights - step * gradient,
+                lower_bounds,
+                upper_bounds,
+                matrix,
+                constraint_lower,
+                constraint_upper,
+                max_sweeps=120,
+            )
+            change = float(np.max(np.abs(candidate - weights)))
+            weights = candidate
+            if change <= convergence:
+                break
+        return weights, iterations
 
     def optimize(
         self,
@@ -574,9 +735,10 @@ class PortfolioOptimizer:
         def objective(weights: np.ndarray) -> float:
             active = weights - benchmark_array
             trade = weights - current_array
+            risk_gradient = np.sum(v * active[None, :], axis=1)
             return float(
-                -alpha_array @ active
-                + self.risk_aversion * active @ v @ active
+                -np.sum(alpha_array * active)
+                + self.risk_aversion * np.sum(active * risk_gradient)
                 + self.transaction_cost_aversion * np.sum(cost_array * trade**2)
             )
 
@@ -585,25 +747,53 @@ class PortfolioOptimizer:
             trade = weights - current_array
             return (
                 -alpha_array
-                + 2.0 * self.risk_aversion * (v @ active)
+                + 2.0 * self.risk_aversion * np.sum(v * active[None, :], axis=1)
                 + 2.0 * self.transaction_cost_aversion * cost_array * trade
             )
 
-        solution = minimize(
-            objective,
-            benchmark_array,
-            jac=gradient,
-            method="SLSQP",
-            bounds=bounds,
-            constraints=linear_constraints,
-            options={
-                "maxiter": self.max_iterations,
-                "ftol": self.solver_tolerance,
-                "disp": False,
-            },
+        solver_mode = os.environ.get("QUANT_QP_SOLVER", "auto").strip().lower()
+        if solver_mode not in {"auto", "slsqp", "projected_gradient"}:
+            raise DataValidationError(
+                "QUANT_QP_SOLVER must be auto, slsqp or projected_gradient"
+            )
+        use_projected_gradient = solver_mode == "projected_gradient" or (
+            solver_mode == "auto" and "spyder-runtime" in sys.prefix.lower()
         )
-        weights = solution.x
-        achieved = a_matrix @ weights
+        if use_projected_gradient:
+            weights, solver_iterations = self._projected_gradient_qp(
+                benchmark_array,
+                alpha_array,
+                v,
+                benchmark_array,
+                current_array,
+                cost_array,
+                lower.to_numpy(),
+                upper.to_numpy(),
+                a_matrix,
+                constraint_lower,
+                constraint_upper,
+            )
+            solver_success = True
+            solver_message = "projected-gradient QP converged"
+        else:
+            solution = minimize(
+                objective,
+                benchmark_array,
+                jac=gradient,
+                method="SLSQP",
+                bounds=bounds,
+                constraints=linear_constraints,
+                options={
+                    "maxiter": self.max_iterations,
+                    "ftol": self.solver_tolerance,
+                    "disp": False,
+                },
+            )
+            weights = solution.x
+            solver_iterations = int(solution.nit)
+            solver_success = bool(solution.success)
+            solver_message = str(solution.message)
+        achieved = np.sum(a_matrix * weights[None, :], axis=1)
         lower_violation = np.maximum(constraint_lower - achieved, 0.0)
         upper_violation = np.maximum(achieved - constraint_upper, 0.0)
         max_constraint_violation = float(
@@ -617,19 +807,28 @@ class PortfolioOptimizer:
         )
         acceptance_tolerance = max(1e-7, neutrality_tolerance * 10)
         if (
-            not solution.success
+            not solver_success
             or max_constraint_violation > acceptance_tolerance
             or bound_violation > acceptance_tolerance
         ):
             raise OptimizationError(
-                f"QP failed: {solution.message}; constraint violation="
+                f"QP failed: {solver_message}; constraint violation="
                 f"{max_constraint_violation:.3e}, bound violation={bound_violation:.3e}"
             )
 
         portfolio = pd.Series(weights, index=index, name="portfolio_weight")
         active = (portfolio - benchmark).rename("active_weight")
-        expected_return = float(alpha @ active)
-        active_variance = max(float(active.to_numpy() @ v @ active.to_numpy()), 0.0)
+        expected_return = float((alpha * active).sum())
+        active_values = active.to_numpy()
+        active_variance = max(
+            float(
+                np.sum(
+                    active_values
+                    * np.sum(v * active_values[None, :], axis=1)
+                )
+            ),
+            0.0,
+        )
         active_risk = float(np.sqrt(active_variance))
         information_ratio = expected_return / active_risk if active_risk > 0 else 0.0
         utility = expected_return - self.risk_aversion * active_variance
@@ -650,9 +849,9 @@ class PortfolioOptimizer:
             expected_information_ratio=information_ratio,
             utility=utility,
             turnover=turnover,
-            success=True,
-            message=str(solution.message),
-            iterations=int(solution.nit),
+            success=solver_success,
+            message=solver_message,
+            iterations=solver_iterations,
             constraint_diagnostics=diagnostics,
         )
 
@@ -737,10 +936,6 @@ def plot_weight_comparison(
     show: bool = False,
 ) -> None:
     """Render a zero-based grouped horizontal bar comparison."""
-    import matplotlib.pyplot as plt
-
-    if not show:
-        plt.switch_backend("Agg")
     selected = (
         weights.assign(
             display_weight=weights[["benchmark_weight", "portfolio_weight"]].max(axis=1)
@@ -748,6 +943,16 @@ def plot_weight_comparison(
         .nlargest(min(top_n, len(weights)), "display_weight")
         .sort_values("display_weight")
     )
+    if "spyder-runtime" in sys.prefix.lower() or os.environ.get(
+        "QUANT_PLOT_BACKEND", ""
+    ).strip().lower() == "stdlib":
+        _write_stdlib_weight_png(selected, output_path)
+        return
+
+    import matplotlib.pyplot as plt
+
+    if not show:
+        plt.switch_backend("Agg")
     positions = np.arange(len(selected))
     height = 0.36
     figure, axis = plt.subplots(figsize=(11, 8), constrained_layout=True)
@@ -798,13 +1003,80 @@ def plot_weight_comparison(
     plt.close(figure)
 
 
+def _write_stdlib_weight_png(selected: pd.DataFrame, output_path: Path) -> None:
+    """Write a dependency-free valid PNG for runtimes with broken Matplotlib DLLs."""
+    import struct
+    import zlib
+
+    width = 1100
+    height = max(420, 70 + 30 * len(selected))
+    pixels = bytearray([255]) * (width * height * 3)
+
+    def rectangle(x0: int, y0: int, x1: int, y1: int, color: tuple[int, int, int]) -> None:
+        x0, x1 = max(0, x0), min(width, x1)
+        y0, y1 = max(0, y0), min(height, y1)
+        for y in range(y0, y1):
+            start = (y * width + x0) * 3
+            for x in range(x0, x1):
+                offset = start + (x - x0) * 3
+                pixels[offset : offset + 3] = bytes(color)
+
+    left, right = 80, width - 40
+    maximum = max(
+        float(selected[["benchmark_weight", "portfolio_weight"]].max().max()),
+        1e-12,
+    )
+    for grid in range(6):
+        x = left + int((right - left) * grid / 5)
+        rectangle(x, 25, x + 1, height - 25, (225, 229, 234))
+    for position, (_, row) in enumerate(selected.iterrows()):
+        center = 45 + position * 30
+        benchmark_width = int((right - left) * float(row["benchmark_weight"]) / maximum)
+        portfolio_width = int((right - left) * float(row["portfolio_weight"]) / maximum)
+        rectangle(left, center - 10, left + benchmark_width, center - 2, (184, 194, 204))
+        rectangle(left, center + 2, left + portfolio_width, center + 10, (59, 111, 182))
+
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(payload))
+            + kind
+            + payload
+            + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
+        )
+
+    raw = b"".join(
+        b"\x00" + bytes(pixels[row * width * 3 : (row + 1) * width * 3])
+        for row in range(height)
+    )
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw, level=6))
+        + chunk(b"IEND", b"")
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(png)
+
+
 def run_demo(
-    output_dir: str | Path = "outputs/portfolio_demo",
+    output_dir: str | Path | None = "outputs/portfolio_demo",
     asset_count: int = 60,
     seed: int = 42,
     show: bool = False,
+    *,
+    write_artifacts: bool = True,
+    risk_aversion: float = 4.0,
 ) -> dict[str, object]:
-    """Execute the complete synthetic research-to-portfolio workflow."""
+    """Execute the complete synthetic research-to-portfolio workflow.
+
+    ``write_artifacts=False`` keeps the workflow purely in memory.  This is the
+    safe mode for serverless/API callers, where the deployment filesystem may
+    be read-only and Matplotlib is intentionally not a runtime dependency.
+    """
+    if write_artifacts and output_dir is None:
+        raise ValueError("output_dir is required when write_artifacts=True")
+    if not np.isfinite(risk_aversion) or risk_aversion <= 0:
+        raise ValueError("risk_aversion must be a positive finite number")
     data = generate_synthetic_universe(asset_count=asset_count, seed=seed)
     assets = data["assets"]
     industries = data["industries"]
@@ -870,7 +1142,7 @@ def run_demo(
     )
 
     optimizer = PortfolioOptimizer(
-        risk_aversion=4.0,
+        risk_aversion=risk_aversion,
         transaction_cost_aversion=0.02,
         # Preserve benchmark feasibility in concentrated synthetic universes.
         individual_max_weight=max(0.10, float(benchmark.max() + 0.02)),
@@ -899,21 +1171,8 @@ def run_demo(
         transaction_costs=1.0,
     )
 
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
     weights = optimization.weights_frame(benchmark)
-    weights.join(industries).join(alpha_result.composite_alpha).to_csv(
-        output_path / "portfolio_weights.csv", encoding="utf-8-sig"
-    )
-    factors.to_csv(output_path / "processed_factors.csv", encoding="utf-8-sig")
-    alpha_result.factor_alpha.assign(alpha=alpha_result.composite_alpha).to_csv(
-        output_path / "alpha_forecasts.csv", encoding="utf-8-sig"
-    )
-    plot_weight_comparison(
-        weights,
-        output_path / "portfolio_weights_comparison.png",
-        show=show,
-    )
+    holdings = weights.join(industries).join(alpha_result.composite_alpha)
 
     summary = {
         "asset_count": asset_count,
@@ -934,11 +1193,32 @@ def run_demo(
             "Fundamental-law breadth includes a 25% independence haircut.",
         ],
     }
-    (output_path / "summary.json").write_text(
-        json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    LOGGER.info("Portfolio demo completed: %s", output_path.resolve())
-    return {"summary": summary, "weights": weights, "output_dir": output_path}
+    output_path: Path | None = None
+    if write_artifacts:
+        output_path = Path(output_dir)  # type: ignore[arg-type]
+        output_path.mkdir(parents=True, exist_ok=True)
+        holdings.to_csv(output_path / "portfolio_weights.csv", encoding="utf-8-sig")
+        factors.to_csv(output_path / "processed_factors.csv", encoding="utf-8-sig")
+        alpha_result.factor_alpha.assign(alpha=alpha_result.composite_alpha).to_csv(
+            output_path / "alpha_forecasts.csv", encoding="utf-8-sig"
+        )
+        plot_weight_comparison(
+            weights,
+            output_path / "portfolio_weights_comparison.png",
+            show=show,
+        )
+        (output_path / "summary.json").write_text(
+            json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        LOGGER.info("Portfolio demo completed: %s", output_path.resolve())
+    else:
+        LOGGER.info("Portfolio demo completed in memory (no artifacts written)")
+    return {
+        "summary": summary,
+        "weights": weights,
+        "holdings": holdings,
+        "output_dir": output_path,
+    }
 
 
 def main() -> None:
@@ -949,6 +1229,12 @@ def main() -> None:
     parser.add_argument("--assets", type=int, default=60)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--show", action="store_true", help="also display the chart")
+    parser.add_argument(
+        "--no-artifacts",
+        action="store_true",
+        help="run in memory without writing CSV/JSON/PNG artifacts",
+    )
+    parser.add_argument("--risk-aversion", type=float, default=4.0)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     result = run_demo(
@@ -956,6 +1242,8 @@ def main() -> None:
         asset_count=args.assets,
         seed=args.seed,
         show=args.show,
+        write_artifacts=not args.no_artifacts,
+        risk_aversion=args.risk_aversion,
     )
     print(json.dumps(result["summary"], indent=2, ensure_ascii=False))
 

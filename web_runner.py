@@ -67,6 +67,45 @@ PROGRAMS = [
         ],
     },
     {
+        "id": "quant_portfolio_system",
+        "title": "多因子组合优化",
+        "file": "quant_portfolio_system.py",
+        "category": "主动组合管理",
+        "status": "ready",
+        "description": "运行 Alpha 压缩、多因子风险模型和带中性约束的二次规划组合优化。",
+        "notice": "使用确定性合成数据演示；云端仅执行内存计算，不写文件、不生成真实订单。",
+        "parameters": [
+            {"name": "asset_count", "label": "模拟资产数", "type": "number", "value": 60, "min": 20, "max": 120, "step": 10},
+            {"name": "top_n", "label": "展示持仓数", "type": "number", "value": 20, "min": 5, "max": 50, "step": 1},
+            {"name": "risk_aversion", "label": "主动风险厌恶系数", "type": "number", "value": 4, "min": 0.5, "max": 20, "step": 0.5},
+            {"name": "seed", "label": "演示随机种子", "type": "number", "value": 42, "min": 0, "max": 1000000, "step": 1},
+        ],
+    },
+    {
+        "id": "tw_kelly_rebalance",
+        "title": "TW 概率森林半凯利调仓",
+        "file": "TWrandomf.pine → tw_kelly_strategy.py",
+        "category": "信号与仓位管理",
+        "status": "ready",
+        "description": "连接 A 股多因子前 20 标的，计算 P(up)/P(down)，使用二分之一凯利生成目标仓位和调仓单。",
+        "notice": "网页仅使用演示 15 分钟行情并输出只读调仓计划；真实 MiniQMT 下单只能在本地通过双重实盘开关执行。",
+        "parameters": [
+            {"name": "total_asset", "label": "模拟总资产(元)", "type": "number", "value": 1000000, "min": 100000, "max": 1000000000, "step": 100000},
+            {"name": "seed", "label": "演示随机种子", "type": "number", "value": 42, "min": 0, "max": 1000000, "step": 1},
+            {
+                "name": "regime_mode",
+                "label": "市场干预状态",
+                "type": "select",
+                "value": "normal",
+                "options": [
+                    {"value": "normal", "label": "正常：动量模型"},
+                    {"value": "inflow", "label": "干预流入：反转模型"},
+                    {"value": "outflow", "label": "干预流出：反转模型"},
+                ],
+            },
+        ],
+    },
+    {
         "id": "bigmoneyflow",
         "title": "ETF 资金流监控",
         "file": "bigmoneyflow.py",
@@ -195,6 +234,83 @@ def _run_boxoption2(payload: dict[str, Any]) -> dict[str, Any]:
         raise
 
 
+def _run_quant_portfolio_system(payload: dict[str, Any]) -> dict[str, Any]:
+    """Run the portfolio model without filesystem or plotting side effects."""
+    asset_count = int(_number(payload, "asset_count", 60, 20, 120))
+    top_n = int(_number(payload, "top_n", 20, 5, 50))
+    risk_aversion = _number(payload, "risk_aversion", 4.0, 0.5, 20.0)
+    seed = int(_number(payload, "seed", 42, 0, 1_000_000))
+
+    from quant_portfolio_system import run_demo
+
+    result = run_demo(
+        output_dir=None,
+        asset_count=asset_count,
+        seed=seed,
+        show=False,
+        write_artifacts=False,
+        risk_aversion=risk_aversion,
+    )
+    holdings = result["holdings"].sort_values(
+        "portfolio_weight", ascending=False
+    ).head(min(top_n, asset_count))
+    portfolio = []
+    for rank, (asset, row) in enumerate(holdings.iterrows(), start=1):
+        portfolio.append(
+            {
+                "rank": rank,
+                "asset": str(asset),
+                "industry": str(row["industry"]),
+                "benchmark_weight_pct": round(float(row["benchmark_weight"]) * 100, 4),
+                "portfolio_weight_pct": round(float(row["portfolio_weight"]) * 100, 4),
+                "active_weight_pct": round(float(row["active_weight"]) * 100, 4),
+                "alpha_forecast_pct": round(float(row["alpha"]) * 100, 5),
+            }
+        )
+
+    summary = dict(result["summary"])
+    summary["displayed_holding_count"] = len(portfolio)
+    return {
+        "program": "quant_portfolio_system.py",
+        "mode": "portfolio_optimization",
+        "is_synthetic": True,
+        "source": "确定性合成多因子研究样本",
+        "data_as_of": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "summary": summary,
+        "portfolio": portfolio,
+        "methodology": {
+            "objective": "maximize alpha' h_A - lambda_A * h_A' V h_A - transaction costs",
+            "alpha_refining": "alpha = residual volatility × IC × standardized score",
+            "risk_model": "V = X F X' + Delta",
+            "constraints": "全投资、禁止空头、行业/风格中性和个股上限",
+            "runtime": "内存计算；不写部署目录，不导入 Matplotlib",
+        },
+    }
+
+
+def _run_tw_kelly_rebalance(payload: dict[str, Any]) -> dict[str, Any]:
+    total_asset = _number(payload, "total_asset", 1_000_000, 100_000, 1_000_000_000)
+    seed = int(_number(payload, "seed", 42, 0, 1_000_000))
+    regime_mode = _choice(payload, "regime_mode", "normal", {"normal", "inflow", "outflow"})
+    from tw_kelly_strategy import RegimeInput, run_tw_kelly_portfolio
+
+    regimes = {
+        "normal": RegimeInput(False, 0.0, 0.0, "NORMAL"),
+        "inflow": RegimeInput(True, 1.0, 2.5, "INTERVENTION_INFLOW"),
+        "outflow": RegimeInput(True, -1.0, -2.5, "INTERVENTION_OUTFLOW"),
+    }
+    return run_tw_kelly_portfolio(
+        top_n=20,
+        universe_size=120,
+        selection_data_mode="demo",
+        history_mode="demo",
+        seed=seed,
+        total_asset=total_asset,
+        available_cash=total_asset,
+        regime=regimes[regime_mode],
+    )
+
+
 def _run_runtime_info(_: dict[str, Any]) -> dict[str, Any]:
     return {
         "program": "Python runtime",
@@ -254,6 +370,8 @@ def _run_project_overview(_: dict[str, Any]) -> dict[str, Any]:
 RUNNERS: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "a_share_selector": _run_a_share_selector,
     "boxoption2": _run_boxoption2,
+    "quant_portfolio_system": _run_quant_portfolio_system,
+    "tw_kelly_rebalance": _run_tw_kelly_rebalance,
     "bigmoneyflow": _run_bigmoneyflow,
     "runtime_info": _run_runtime_info,
     "project_overview": _run_project_overview,

@@ -7,6 +7,7 @@ from a_share_selector import (
     AShareDataProvider,
     AShareSelectionConfig,
     AShareSelector,
+    MarketDataUnavailable,
     SnapshotResult,
     generate_demo_snapshot,
     run_a_share_selection,
@@ -23,6 +24,17 @@ class AShareUniverseTests(unittest.TestCase):
                 snapshot = AShareDataProvider().fetch("auto")
         self.assertTrue(snapshot.is_synthetic)
         self.assertIn("实时数据不可用", snapshot.fallback_reason)
+
+    def test_live_mode_preserves_the_root_network_error(self):
+        with patch.object(
+            AShareDataProvider,
+            "_fetch_live",
+            side_effect=ConnectionError("remote endpoint closed the connection"),
+        ):
+            with self.assertRaises(MarketDataUnavailable) as raised:
+                AShareDataProvider().fetch("live")
+        self.assertIn("ConnectionError", str(raised.exception))
+        self.assertIn("remote endpoint closed", str(raised.exception))
 
     def test_a_share_trading_filters_remove_st_zero_turnover_and_price_limit(self):
         frame = generate_demo_snapshot()

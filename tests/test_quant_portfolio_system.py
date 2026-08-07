@@ -1,6 +1,9 @@
+import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -12,6 +15,7 @@ from quant_portfolio_system import (
     PortfolioOptimizer,
     run_demo,
 )
+from web_runner import run_registered
 
 
 class DataProcessorTests(unittest.TestCase):
@@ -108,6 +112,29 @@ class RiskAndOptimizationTests(unittest.TestCase):
             np.allclose(style.T @ result.active_weights, 0.0, atol=2e-7)
         )
 
+    def test_projected_gradient_fallback_respects_constraints(self):
+        assets = pd.Index([f"A{i}" for i in range(8)])
+        benchmark = pd.Series(1 / 8, index=assets)
+        alpha = pd.Series(np.linspace(-0.02, 0.02, 8), index=assets)
+        covariance = pd.DataFrame(np.eye(8) * 0.04, index=assets, columns=assets)
+        industries = pd.get_dummies(
+            pd.Series(["X"] * 4 + ["Y"] * 4, index=assets), dtype=float
+        ).iloc[:, 1:]
+        with patch.dict(os.environ, {"QUANT_QP_SOLVER": "projected_gradient"}):
+            result = PortfolioOptimizer(
+                risk_aversion=3.0, individual_max_weight=0.225
+            ).optimize(
+                alpha,
+                covariance,
+                benchmark,
+                industry_exposure=industries,
+                active_upper_bound=0.10,
+                neutrality_tolerance=1e-8,
+            )
+        self.assertEqual(result.message, "projected-gradient QP converged")
+        self.assertAlmostEqual(float(result.portfolio_weights.sum()), 1.0, places=8)
+        self.assertLessEqual(result.constraint_diagnostics["max_constraint_violation"], 1e-7)
+
 
 class EndToEndTests(unittest.TestCase):
     def test_factor_interfaces_and_demo_outputs(self):
@@ -125,6 +152,18 @@ class EndToEndTests(unittest.TestCase):
             self.assertTrue((output / "alpha_forecasts.csv").exists())
             self.assertTrue((output / "portfolio_weights_comparison.png").exists())
             self.assertTrue((output / "summary.json").exists())
+
+    def test_serverless_mode_is_json_serializable_and_writes_nothing(self):
+        result = run_registered(
+            "quant_portfolio_system",
+            {"asset_count": 30, "top_n": 8, "risk_aversion": 4, "seed": 7},
+        )
+        self.assertEqual(result["mode"], "portfolio_optimization")
+        self.assertTrue(result["is_synthetic"])
+        self.assertEqual(result["summary"]["asset_count"], 30)
+        self.assertEqual(len(result["portfolio"]), 8)
+        self.assertIn("STK", result["portfolio"][0]["asset"])
+        json.dumps(result, ensure_ascii=False)
 
 
 if __name__ == "__main__":
