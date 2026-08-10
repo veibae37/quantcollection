@@ -74,11 +74,11 @@ python -B qmt_live_publisher.py
 不需要新建网站。在当前 `quantcollection` Vercel 项目中：
 
 1. 连接一个 Private Vercel Blob store，使项目获得 `BLOB_READ_WRITE_TOKEN`。
-2. 新增 `QMT_WEBHOOK_SECRET`，值必须与本机 `.env` 完全相同。
+2. 将 Blob 面板给出的 `QMT_STORE_ID` 与 `BLOB_READ_WRITE_TOKEN` 仅复制到本机忽略提交的 `.env`。若未显式设置 `QMT_WEBHOOK_SECRET`，服务端与发布器会用 HMAC-SHA256 单向派生独立的请求密钥，Blob 主令牌不会进入请求头或网页。
 3. 可选新增 `QMT_SECRET_HEADER=X-QMT-Secret`、`QMT_SNAPSHOT_STALE_SECONDS=900`。
 4. 部署本仓库后访问首页；港股方法页为 `/hk-factor-lab`。
 
-`BLOB_READ_WRITE_TOKEN` 只放在 Vercel，绝不能写进本机发布 JSON、网页或 Git。
+`BLOB_READ_WRITE_TOKEN` 只能存在于 Vercel 私有环境和本机忽略提交的 `.env`，绝不能写进发布 JSON、网页或 Git。
 
 ## API
 
