@@ -15,6 +15,7 @@ from quant_portfolio_system import (
     PortfolioOptimizer,
     run_demo,
 )
+from live_snapshot_store import LiveSnapshotUnavailable
 from web_runner import run_registered
 
 
@@ -153,17 +154,14 @@ class EndToEndTests(unittest.TestCase):
             self.assertTrue((output / "portfolio_weights_comparison.png").exists())
             self.assertTrue((output / "summary.json").exists())
 
-    def test_serverless_mode_is_json_serializable_and_writes_nothing(self):
-        result = run_registered(
-            "quant_portfolio_system",
-            {"asset_count": 30, "top_n": 8, "risk_aversion": 4, "seed": 7},
-        )
-        self.assertEqual(result["mode"], "portfolio_optimization")
-        self.assertTrue(result["is_synthetic"])
-        self.assertEqual(result["summary"]["asset_count"], 30)
-        self.assertEqual(len(result["portfolio"]), 8)
-        self.assertIn("STK", result["portfolio"][0]["asset"])
-        json.dumps(result, ensure_ascii=False)
+    def test_serverless_mode_requires_published_qmt_snapshot(self):
+        with patch.dict(
+            os.environ,
+            {"BLOB_READ_WRITE_TOKEN": "", "QMT_LIVE_SNAPSHOT_FILE": ""},
+            clear=False,
+        ):
+            with self.assertRaises(LiveSnapshotUnavailable):
+                run_registered("quant_portfolio_system", {"seed": 7})
 
 
 if __name__ == "__main__":

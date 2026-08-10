@@ -57,7 +57,7 @@ function selectProgram(id) {
   $("#parameter-fields").innerHTML = program.parameters.map(fieldTemplate).join("");
   const button = $("#run-button");
   button.disabled = program.status !== "ready";
-  button.querySelector(".button-label").textContent = program.status === "ready" ? "运行程序" : "当前环境不可运行";
+  button.querySelector(".button-label").textContent = program.status === "ready" ? "读取 QMT 实盘快照" : "当前环境不可运行";
   $("#result-area").classList.add("hidden");
 }
 
@@ -78,7 +78,7 @@ $("#run-form").addEventListener("submit", async (event) => {
   const parameters = Object.fromEntries(new FormData(event.currentTarget).entries());
   button.disabled = true;
   button.classList.add("loading");
-  label.textContent = "运行中";
+  label.textContent = "读取中";
   try {
     const response = await fetch("/api/run", {
       method: "POST",
@@ -93,11 +93,16 @@ $("#run-form").addEventListener("submit", async (event) => {
   } finally {
     button.disabled = false;
     button.classList.remove("loading");
-    label.textContent = "再次运行";
+    label.textContent = "刷新 QMT 实盘快照";
   }
 });
 
 function renderResult(result, durationMs) {
+  const marketModes = new Set(["a_share_selection", "option_market_scan", "portfolio_optimization", "tw_kelly_rebalance", "market_data"]);
+  if (marketModes.has(result.mode) && result.is_synthetic !== false) {
+    renderError("服务器返回了非 QMT 实盘数据，页面已拒绝显示");
+    return;
+  }
   $("#result-area").classList.remove("hidden", "error-message");
   $("#duration").textContent = `${durationMs} ms`;
   $("#metric-grid").innerHTML = buildMetrics(result).map(([label, value]) => `<div class="metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}</strong></div>`).join("");
@@ -114,14 +119,14 @@ function renderResult(result, durationMs) {
 
 function renderSource(result) {
   const banner = $("#source-banner");
-  if (!["a_share_selection", "option_market_scan", "portfolio_optimization", "tw_kelly_rebalance"].includes(result.mode)) {
+  if (!["a_share_selection", "option_market_scan", "portfolio_optimization", "tw_kelly_rebalance", "market_data"].includes(result.mode)) {
     banner.className = "source-banner hidden";
     banner.textContent = "";
     return;
   }
-  const mode = result.is_synthetic ? "演示数据" : "实时快照";
+  const mode = "QMT 实盘快照";
   const fallback = result.fallback_reason ? ` · ${result.fallback_reason}` : "";
-  banner.className = `source-banner ${result.is_synthetic ? "synthetic" : "live-source"}`;
+  banner.className = "source-banner live-source";
   banner.innerHTML = `<strong>${escapeHtml(mode)}</strong><span>${escapeHtml(result.source)} · 数据时间 ${escapeHtml(result.data_as_of)}${escapeHtml(fallback)}</span>`;
 }
 
@@ -239,7 +244,7 @@ function buildMetrics(result) {
   if (result.mode === "a_share_selection") {
     const summary = result.summary;
     return [
-      ["数据状态", result.is_synthetic ? "演示快照" : "实时快照"],
+      ["数据状态", "QMT 实盘快照"],
       ["可投资股票", summary.eligible_count],
       ["输出标的", summary.selected_count],
       ["组合权重覆盖", `${formatNumber(summary.selected_weight_coverage_pct, 2)}%`],
@@ -253,7 +258,7 @@ function buildMetrics(result) {
   if (result.mode === "option_market_scan") {
     const summary = result.summary;
     return [
-      ["数据状态", result.is_synthetic ? "演示快照" : "实时快照"],
+      ["数据状态", "QMT 实盘快照"],
       ["期权合约", summary.contract_count],
       ["标的族", summary.underlying_count],
       ["配对行权价", summary.paired_strike_count],
@@ -292,7 +297,6 @@ function buildMetrics(result) {
       ["仓位方法", "二分之一凯利"],
     ];
   }
-  if (result.mode === "demo") return [["套利机会", result.has_opportunity ? "满足条件" : "未触发"], ["盒式收益", result.box_profit == null ? "—" : formatNumber(result.box_profit, 6)], ["模拟订单", result.orders.length], ["利率", `${formatNumber(result.input.interest_rate * 100, 2)}%`], ["触发阈值", result.input.actionpoint], ["数据来源", "内置模拟盘口"]];
   if (result.mode === "market_data") return [["状态", result.regime], ["方向", result.direction], ["代理流入", `${formatNumber(result.total_net_flow_cny / 1e8, 2)} 亿元`], ["规模占比", `${formatNumber(result.flow_ratio_bps, 2)} bps`], ["强度分数", formatNumber(result.strength_score, 2)], ["ETF 数量", result.etf_count]];
   return Object.entries(result.summary || {}).slice(0, 9).map(([key, value]) => [key.replaceAll("_", " "), value]);
 }

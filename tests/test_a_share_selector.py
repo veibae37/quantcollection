@@ -12,6 +12,7 @@ from a_share_selector import (
     generate_demo_snapshot,
     run_a_share_selection,
 )
+from live_snapshot_store import LiveSnapshotUnavailable
 from web_runner import PROGRAMS, run_registered
 
 
@@ -83,12 +84,14 @@ class AShareUniverseTests(unittest.TestCase):
 class WebRegistrationTests(unittest.TestCase):
     def test_a_share_selector_is_default_cloud_program(self):
         self.assertEqual(PROGRAMS[0]["id"], "a_share_selector")
-        result = run_registered(
-            "a_share_selector",
-            {"data_mode": "demo", "top_n": "10", "universe_size": "80"},
-        )
-        self.assertEqual(result["mode"], "a_share_selection")
-        self.assertEqual(result["summary"]["selected_count"], 10)
+        self.assertEqual(PROGRAMS[0]["parameters"], [])
+        with patch.dict(
+            os.environ,
+            {"BLOB_READ_WRITE_TOKEN": "", "QMT_LIVE_SNAPSHOT_FILE": ""},
+            clear=False,
+        ):
+            with self.assertRaises(LiveSnapshotUnavailable):
+                run_registered("a_share_selector", {"data_mode": "demo"})
 
 
 if __name__ == "__main__":

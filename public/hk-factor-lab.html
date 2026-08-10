@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07110e" />
+    <meta name="description" content="基于 MiniQMT 实盘快照的港股 PIT 量化因子研究框架；无演示数据、无合成回退。" />
+    <meta property="og:title" content="港股因子引擎｜Hong Kong Alpha Lab" />
+    <meta property="og:description" content="十二因子、PIT 信息边界与 MiniQMT 实盘数据状态。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/hk-factor-og.png" />
+    <title>港股因子引擎｜Hong Kong Alpha Lab</title>
+    <link rel="stylesheet" href="/hk-factor-lab.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#content">跳至主要内容</a>
+    <header class="lab-header">
+      <a class="lab-brand" href="/" aria-label="返回 Quant Console">
+        <span class="lab-mark" aria-hidden="true">HK</span>
+        <span><strong>ALPHA LAB</strong><small>港股因子引擎</small></span>
+      </a>
+      <nav aria-label="页面导航">
+        <a href="#atlas">因子图谱</a><a href="#pit">PIT 引擎</a><a href="#live">实盘状态</a><a href="#validation">验证边界</a>
+      </nav>
+      <a class="console-link" href="/">QUANT CONSOLE <span aria-hidden="true">→</span></a>
+    </header>
+
+    <main id="content">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="hero-grid" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <p class="eyebrow"><span>HONG KONG EQUITY RESEARCH</span><span>QMT LIVE · POINT-IN-TIME</span></p>
+          <h1 id="hero-title">把港股定价分歧，<br /><em>加工成可交易的证据。</em></h1>
+          <p class="lede">融合境内外预期博弈、南向资金、分析师网络与经典七因子，并以严格的可得时间控制每一个历史信号。</p>
+          <div class="hero-actions">
+            <a class="primary-action" href="#live">查看实盘状态 <span aria-hidden="true">→</span></a>
+            <a class="text-action" href="#pit">阅读信息边界 <span aria-hidden="true">→</span></a>
+          </div>
+        </div>
+        <aside class="thesis" aria-label="研究核心主张">
+          <span class="section-index">THESIS / 01</span>
+          <blockquote>所有信号都回答同一个问题：<strong>在这个交易日，当时真正知道什么？</strong></blockquote>
+          <div class="signal-line" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        </aside>
+        <dl class="metric-strip" aria-label="研究规模">
+          <div><dt>有效因子</dt><dd>12<small>signals</small></dd></div>
+          <div><dt>数据来源</dt><dd>QMT<small>live only</small></dd></div>
+          <div><dt>演示回退</dt><dd>OFF<small>strict</small></dd></div>
+          <div><dt>信息边界</dt><dd>PIT<small>as-of</small></dd></div>
+        </dl>
+      </section>
+
+      <section class="data-notice" aria-label="数据状态说明">
+        <strong>MINIQMT 实盘专用</strong>
+        <span>不展示演示数据 · 不生成合成个股 · 不调用公网行情替代</span>
+        <span>本机采集，认证上传</span>
+        <span>数据失败时明确显示不可用</span>
+      </section>
+
+      <section class="section atlas" id="atlas" aria-labelledby="atlas-title">
+        <div class="section-heading">
+          <div><span class="section-index">FACTOR ATLAS / 02</span><h2 id="atlas-title">十二因子，一张港股定价地图</h2></div>
+          <p>方法定义独立于当日是否有数据；只有完整通过来源与时间校验的 QMT 快照才会进入实盘结果区。</p>
+        </div>
+        <div class="atlas-layout">
+          <div class="factor-list" id="factor-list" aria-label="选择因子查看定义"></div>
+          <article class="factor-detail" aria-live="polite">
+            <div class="detail-top"><span id="detail-index" class="factor-number">01</span><span id="detail-category" class="factor-category"></span></div>
+            <h3 id="detail-name"></h3><code id="detail-key"></code><p id="detail-description"></p>
+            <div class="formula"><span>FORMULA</span><strong id="detail-formula"></strong></div>
+            <p class="direction"><span>输出</span>逐日 2%/98% trimming、行业内 z-score、对数市值中性化后的截面残差。</p>
+          </article>
+        </div>
+        <p class="count-note"><strong>计数说明：</strong><code>inflow_rate_open</code> 同时属于南向资金模块和经典七因子体系，按唯一字段计为 12 项。</p>
+      </section>
+
+      <section class="section pit" id="pit" aria-labelledby="pit-title">
+        <div class="section-heading inverse">
+          <div><span class="section-index">PIT ENGINE / 03</span><h2 id="pit-title">时间边界，先于因子公式</h2></div>
+          <p>PIT 不是一次 <code>shift(1)</code>，而是贯穿事件生效、依赖传播与日频映射的知识时间体系。</p>
+        </div>
+        <div class="timeline" aria-label="信息从发生到可交易的时间路径">
+          <div><span>REPORT PERIOD</span><strong>财务事实</strong><small>报告期内计算</small></div><i aria-hidden="true">→</i>
+          <div><span>AVAILABLE AT</span><strong>首次可得</strong><small>冻结首版披露</small></div><i aria-hidden="true">→</i>
+          <div class="active"><span>FIRST EFFECTIVE</span><strong>下一可用交易日</strong><small>backward as-of 映射</small></div>
+        </div>
+        <div class="pit-rules">
+          <article><span>01</span><h3>首版财报冻结</h3><p>每只股票、每个报告期只保留首次真实可得版本，后续修订不回写历史。</p></article>
+          <article><span>02</span><h3>报告期内计算</h3><p>同比、差分和趋势先在报告期事件序列完成，再映射到日频。</p></article>
+          <article><span>03</span><h3>Backward as-of</h3><p>信号日只读取生效时间不晚于当日的数据，禁止未来回填。</p></article>
+          <article><span>04</span><h3>盘后信息顺延</h3><p>收盘后披露的信息从下一交易日生效，不进入当日收盘信号。</p></article>
+          <article><span>05</span><h3>依赖时间传播</h3><p>复合指标以所有必要组成数据中最晚的可得时间为准。</p></article>
+          <article><span>06</span><h3>同预测期锁定</h3><p>境内外预期差与三个月修订只比较同一财政预测期和统一口径。</p></article>
+        </div>
+      </section>
+
+      <section class="section live-section" id="live" aria-labelledby="live-title">
+        <div class="section-heading">
+          <div><span class="section-index">LIVE QMT SNAPSHOT / 04</span><h2 id="live-title">港股因子实盘状态</h2></div>
+          <p>页面只从服务器读取最近一次经认证的 QMT 快照。没有完整数据时不绘图、不排名、不显示任何模拟股票。</p>
+        </div>
+        <div class="live-board" id="live-board" aria-live="polite">
+          <div class="live-state waiting" id="live-status"><i></i><div><strong>正在读取 QMT 实盘快照</strong><span>请求 /api/live?program=hk_factor</span></div></div>
+          <div id="live-content"></div>
+        </div>
+        <ol class="pipeline" aria-label="因子加工流程">
+          <li><span>01</span>QMT 实盘行情与事件</li><li><span>02</span>PIT 映射</li><li><span>03</span>12 个原始因子</li>
+          <li><span>04</span>2% / 98% trimming</li><li><span>05</span>行业内 z-score</li><li><span>06</span>市值中性残差</li>
+        </ol>
+      </section>
+
+      <section class="section validation" id="validation" aria-labelledby="validation-title">
+        <div class="section-heading inverse">
+          <div><span class="section-index">VALIDATION / 05</span><h2 id="validation-title">没有数据，也不能降低验证标准</h2></div>
+          <p>新增未来信息不得改写历史结果；来源不完整、时间不合法或标记为合成的数据会在 API 边界被拒绝。</p>
+        </div>
+        <ol class="test-grid" id="test-grid"></ol>
+      </section>
+
+      <section class="section boundaries" aria-labelledby="boundaries-title">
+        <div><span class="section-index">DATA BOUNDARIES / 06</span><h2 id="boundaries-title">QMT 字段边界</h2></div>
+        <ul>
+          <li>QMT 能提供的行情、成交额、持仓或已下载财务字段可进入实时链路。</li>
+          <li>境内外分析师一致预期、研报标题、评级上调和共同分析师网络必须有独立 PIT 数据表；QMT 未提供时保持不可用。</li>
+          <li>网站不会用固定五股样本、随机种子或公网数据填补缺口。</li>
+          <li>网页只读，不读取交易账户，不触发真实委托。</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="lab-footer">
+      <div><strong>HK ALPHA LAB</strong><span>MiniQMT live-only · Quant Console Research</span></div>
+      <p>本页面展示因子方法与经验证的实盘快照状态，不构成投资建议或收益承诺。</p>
+      <a href="/">返回 Quant Console →</a>
+    </footer>
+    <script src="/hk-factor-lab.js" defer></script>
+  </body>
+</html>
