@@ -16,6 +16,7 @@ from live_snapshot_store import (
     load_live_bundle,
     save_live_bundle,
 )
+from qmt_auth import resolve_qmt_webhook_secret
 
 
 def _response(handler: BaseHTTPRequestHandler, status: int, payload: dict) -> None:
@@ -53,7 +54,7 @@ class handler(BaseHTTPRequestHandler):
             return _response(self, 500, {"ok": False, "error": "读取 QMT 实盘快照失败"})
 
     def do_POST(self):
-        secret = os.environ.get("QMT_WEBHOOK_SECRET", "")
+        secret = resolve_qmt_webhook_secret()
         secret_header = os.environ.get("QMT_SECRET_HEADER", "X-QMT-Secret")
         supplied = self.headers.get(secret_header, "")
         if not secret or not hmac.compare_digest(supplied, secret):

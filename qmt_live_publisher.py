@@ -25,6 +25,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from qmt_auth import resolve_qmt_webhook_secret
+
 from live_snapshot_store import SCHEMA_VERSION, validate_bundle
 
 
@@ -386,7 +388,7 @@ def main() -> None:
         parser.error("请在本机 .env 设置 MINI_QMT_PATH")
     userdata_path = Path(path_value).expanduser().resolve()
     url = os.environ.get("QMT_WEBHOOK_URL", DEFAULT_WEBHOOK_URL).strip()
-    secret = os.environ.get("QMT_WEBHOOK_SECRET", "").strip()
+    secret = resolve_qmt_webhook_secret()
     secret_header = os.environ.get("QMT_SECRET_HEADER", "X-QMT-Secret").strip()
     interval = max(15.0, float(os.environ.get("QMT_PUBLISH_INTERVAL", "60")))
 
