@@ -1,13 +1,13 @@
 import json
 from http.server import BaseHTTPRequestHandler
 
-from web_runner import PROGRAMS, public_config
+from web_runner import public_config, public_programs
 
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         body = json.dumps(
-            {"ok": True, "config": public_config(), "programs": PROGRAMS},
+            {"ok": True, "config": public_config(), "programs": public_programs()},
             ensure_ascii=False,
         ).encode("utf-8")
         self.send_response(200)

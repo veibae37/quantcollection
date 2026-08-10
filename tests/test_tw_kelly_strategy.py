@@ -11,6 +11,7 @@ from miniqmt_kelly_executor import (
     MiniQMTConfigurationError,
     MiniQMTKellyExecutor,
 )
+from live_snapshot_store import LiveSnapshotUnavailable
 from tw_kelly_strategy import (
     KellyConfig,
     PineProbabilityForest,
@@ -143,13 +144,14 @@ class WebRegistrationTests(unittest.TestCase):
     def test_tw_kelly_program_is_registered_and_read_only(self):
         program = next(item for item in PROGRAMS if item["id"] == "tw_kelly_rebalance")
         self.assertEqual(program["status"], "ready")
-        result = run_registered(
-            "tw_kelly_rebalance",
-            {"total_asset": 1_000_000, "seed": 42, "regime_mode": "normal"},
-        )
-        self.assertEqual(result["mode"], "tw_kelly_rebalance")
-        self.assertEqual(len(result["portfolio"]), 20)
-        self.assertNotIn("execution", result)
+        self.assertEqual(program["parameters"], [])
+        with patch.dict(
+            os.environ,
+            {"BLOB_READ_WRITE_TOKEN": "", "QMT_LIVE_SNAPSHOT_FILE": ""},
+            clear=False,
+        ):
+            with self.assertRaises(LiveSnapshotUnavailable):
+                run_registered("tw_kelly_rebalance", {"seed": 42})
 
 
 if __name__ == "__main__":

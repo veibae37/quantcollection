@@ -13,6 +13,7 @@ from option_market_scanner import (
     generate_demo_option_market,
     run_option_market_scan,
 )
+from live_snapshot_store import LiveSnapshotUnavailable
 from scanner_worker import (
     DEFAULT_WEBHOOK_URL,
     QMTETFOptionProvider,
@@ -196,18 +197,14 @@ class MarketWideOptionTests(unittest.TestCase):
         self.assertEqual(payload["opportunity_count"], 1)
         self.assertTrue(_valid_payload(payload))
 
-    def test_web_boxoption_uses_market_scanner_not_four_contract_fixture(self):
-        result = run_registered(
-            "boxoption2",
-            {"data_mode": "demo", "top_n": "10", "min_volume": "1"},
-        )
-        self.assertEqual(result["mode"], "option_market_scan")
-        self.assertGreater(result["summary"]["contract_count"], 4)
-        self.assertGreater(len(result["opportunities"]), 0)
-        self.assertLessEqual(len(result["opportunities"]), 10)
-        self.assertTrue(
-            all(item["true_net_profit_cny"] > 0 for item in result["opportunities"])
-        )
+    def test_web_boxoption_requires_published_qmt_snapshot(self):
+        with patch.dict(
+            os.environ,
+            {"BLOB_READ_WRITE_TOKEN": "", "QMT_LIVE_SNAPSHOT_FILE": ""},
+            clear=False,
+        ):
+            with self.assertRaises(LiveSnapshotUnavailable):
+                run_registered("boxoption2", {"data_mode": "demo"})
 
 
 if __name__ == "__main__":

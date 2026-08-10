@@ -4,6 +4,7 @@ import time
 from http.server import BaseHTTPRequestHandler
 
 from web_runner import run_registered
+from live_snapshot_store import LiveSnapshotUnavailable
 
 
 def response(handler_instance, status, payload):
@@ -39,5 +40,7 @@ class handler(BaseHTTPRequestHandler):
             return response(self, 400, {"ok": False, "error": "请求不是有效的 JSON"})
         except (KeyError, ValueError, PermissionError) as exc:
             return response(self, 400, {"ok": False, "error": str(exc)})
+        except LiveSnapshotUnavailable as exc:
+            return response(self, 503, {"ok": False, "error": str(exc)})
         except Exception as exc:
             return response(self, 500, {"ok": False, "error": f"程序运行失败：{type(exc).__name__}"})
