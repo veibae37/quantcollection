@@ -1,0 +1,68 @@
+{
+  "schema_version": "xalpha-qlib-backtest.v1",
+  "factor": {
+    "kind": "micro-python",
+    "source": "def compute_factor(data):\n    close = data[\"close\"]\n    return -cs_rank(ts_corr(ts_delta(close, 1), ts_delta(ts_std(close, 5), 1), 20))",
+    "name": "Factor_C801_Seed_v1"
+  },
+  "universe": {
+    "requested": "csi300",
+    "qlib_market": "csi300",
+    "benchmark": "SH000300"
+  },
+  "period": {
+    "start": "2021-01-04",
+    "end": "2026-07-31"
+  },
+  "strategy": {
+    "top_k": 50,
+    "hold_days": 5,
+    "account": 100000000
+  },
+  "cost_model": {
+    "stamp_duty": 0.0005,
+    "commission": 0.0002,
+    "slippage": 0.001,
+    "min_cost": 5
+  },
+  "data_quality": {
+    "row_count": 405109,
+    "date_count": 1351,
+    "instrument_count": 459,
+    "raw_invalid_ratio": 0.013830845525525229,
+    "exposure_coverage": 0,
+    "processed_valid_ratio": 0.9861691544744747,
+    "neutralization": "partial_exposure_with_explicit_fallback",
+    "median_daily_valid_instruments": 298
+  },
+  "rank_ic": {
+    "observations": 1351,
+    "rank_ic_mean_daily": 0.02300698667449335,
+    "rank_ic_std_daily": 0.1743489675233079,
+    "rank_ic_ir": 0.13195940877262524,
+    "rank_ic_ir_annualized": 2.094790672604889,
+    "rank_ic_mean_annualized_linear": 5.797760641972324,
+    "rank_ic_positive_ratio": 0.5470022205773502
+  },
+  "quantile_annualized_returns": {
+    "Q1": -0.024496177229239913,
+    "Q2": -0.018333348721090603,
+    "Q3": 0.07965640164613585,
+    "Q4": 0.016757417757851334,
+    "Q5": 0.010548615546028595
+  },
+  "portfolio": {
+    "portfolio_annualized_return_net": -0.0603884258226155,
+    "benchmark_annualized_return": -0.02347278594970703,
+    "alpha_annualized_compounded": -0.03780308744045269,
+    "maximum_drawdown": -0.37526476462492286,
+    "maximum_drawdown_peak": "2021-01-21",
+    "maximum_drawdown_trough": "2024-02-05",
+    "average_daily_turnover": 0.12121990781188592,
+    "total_cost_ratio_sum": 0.07346547416723889
+  },
+  "warnings": [
+    "Qlib 暴露字段 $market_cap 不可用：ValueError: Qlib 未返回数据",
+    "Qlib 暴露字段 $sw_l1 不可用：ValueError: Qlib 未返回数据"
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "start_date": "2022-12-01",
+  "end_date": "2026-09-18",
+  "trading_days": 923,
+  "strategy_total_return": 0,
+  "strategy_annualized_return": 0,
+  "strategy_max_drawdown": 0,
+  "benchmark_total_return": 0.15456548521144597,
+  "benchmark_annualized_return": 0.04006426100255989,
+  "average_exposure": 0,
+  "trade_count": 0,
+  "long_threshold": 0.5,
+  "exit_threshold": -0.3,
+  "transaction_cost_bps": 0,
+  "is_synthetic": false,
+  "factor_complete_rows": 668,
+  "weights": {
+    "pcr": 0.2,
+    "margin": 0.2,
+    "ivix": 0.1,
+    "new_high": 0.2,
+    "basis": 0.1,
+    "stock_bond": 0.2
+  },
+  "thresholds": {
+    "pcr": {
+      "buy_threshold": 1.2,
+      "buy_operator": ">=",
+      "sell_threshold": 0.5,
+      "sell_operator": "<="
+    },
+    "margin": {
+      "buy_threshold": 0.95,
+      "buy_operator": ">=",
+      "sell_threshold": 0.1,
+      "sell_operator": "<="
+    },
+    "ivix": {
+      "buy_threshold": 14,
+      "buy_operator": "<=",
+      "sell_threshold": null,
+      "sell_operator": null
+    },
+    "new_high": {
+      "buy_threshold": 0.001,
+      "buy_operator": "<=",
+      "sell_threshold": 0.5,
+      "sell_operator": ">="
+    },
+    "basis": {
+      "buy_threshold": null,
+      "buy_operator": null,
+      "sell_threshold": 0.9,
+      "sell_operator": ">="
+    },
+    "stock_bond": {
+      "buy_threshold": 0.05,
+      "buy_operator": "<=",
+      "sell_threshold": 0.95,
+      "sell_operator": ">="
+    }
+  },
+  "percentile_window": 1260,
+  "min_percentile_history": 1000,
+  "benchmark_source": "AKShare CSI 1000"
+}

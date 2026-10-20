@@ -1,0 +1,106 @@
+{
+  "schema_version": "ma-vol-walkforward.v1",
+  "source": {
+    "type": "local_qlib",
+    "provider": ".runtime/qlib-cn-2026-08-12",
+    "data_end": "2026-08-12T00:00:00"
+  },
+  "split": {
+    "train_start": "2024-02-19T00:00:00",
+    "train_end": "2026-02-11T00:00:00",
+    "test_start": "2026-02-12T00:00:00",
+    "test_end": "2026-08-12T00:00:00"
+  },
+  "anti_cheating": {
+    "signal_timing": "signal after close t; execution at open t+1",
+    "parameter_selection": "8 predeclared candidates ranked only on the two-year train set",
+    "holdout_policy": "latest six months evaluated once after global parameter selection",
+    "constituents": {
+      "csi1000": "Qlib csi1000.txt point-in-time membership",
+      "csi2000": "point-in-time CSI All Share minus CSI800/CSI1000; top 2000 by lagged 60d amount proxy",
+      "microcap": "point-in-time small-cap candidates; bottom 400 by lagged 60d amount proxy"
+    },
+    "survivorship_rule": "point-in-time Qlib intervals; no current-list backfill"
+  },
+  "universe_diagnostics": {
+    "csi1000": {
+      "median_members": 1000,
+      "minimum_members": 986,
+      "maximum_members": 1000
+    },
+    "csi2000": {
+      "median_members": 1857,
+      "minimum_members": 1142,
+      "maximum_members": 2000
+    },
+    "microcap": {
+      "median_members": 400,
+      "minimum_members": 400,
+      "maximum_members": 400
+    }
+  },
+  "selected_parameters": {
+    "ma_window": 120,
+    "vol_window": 20,
+    "hold_days": 5,
+    "top_k": 50
+  },
+  "cost_model": {
+    "commission": 0.0002,
+    "stamp_duty": 0.0005,
+    "slippage": 0.001
+  },
+  "training_global_objective": 0.3742809895769877,
+  "test_results": [
+    {
+      "market": "csi1000",
+      "universe_definition": "Qlib csi1000.txt point-in-time membership",
+      "period_count": 23,
+      "total_return": 0.0371815834110476,
+      "annualized_return": 0.08328488840742798,
+      "annualized_benchmark_return": -0.18081966885850298,
+      "annualized_excess_return": 0.32240099917671516,
+      "sharpe": 0.46015914227192095,
+      "excess_sharpe": 1.444606406098164,
+      "maximum_drawdown": -0.10426719261451156,
+      "average_one_way_turnover": 0.4086956521739131,
+      "total_cost": 0.02701,
+      "average_selected": 50
+    },
+    {
+      "market": "csi2000",
+      "universe_definition": "point-in-time CSI All Share minus CSI800/CSI1000; top 2000 by lagged 60d amount proxy",
+      "period_count": 23,
+      "total_return": -0.12238511482168479,
+      "annualized_return": -0.24878929810422878,
+      "annualized_benchmark_return": -0.2617193921713369,
+      "annualized_excess_return": 0.017513793441137127,
+      "sharpe": -0.7286361554268498,
+      "excess_sharpe": 0.18903415204320903,
+      "maximum_drawdown": -0.2471431245048349,
+      "average_one_way_turnover": 0.557391304347826,
+      "total_cost": 0.036928,
+      "average_selected": 50
+    },
+    {
+      "market": "microcap",
+      "universe_definition": "point-in-time small-cap candidates; bottom 400 by lagged 60d amount proxy",
+      "period_count": 23,
+      "total_return": -0.10610725060426063,
+      "annualized_return": -0.21791939250171188,
+      "annualized_benchmark_return": -0.23033113564179986,
+      "annualized_excess_return": 0.016126081896840727,
+      "sharpe": -1.618322400917543,
+      "excess_sharpe": 0.17937080400537042,
+      "maximum_drawdown": -0.1115626912295411,
+      "average_one_way_turnover": 0.2939130434782608,
+      "total_cost": 0.019354000000000003,
+      "average_selected": 50
+    }
+  ],
+  "artifacts": {
+    "training_grid": ".runtime/ma-vol-walkforward/training-grid-results.csv",
+    "parameter_ranking": ".runtime/ma-vol-walkforward/training-parameter-ranking.csv",
+    "holdout_results": ".runtime/ma-vol-walkforward/holdout-test-results.csv"
+  }
+}

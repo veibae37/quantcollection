@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="260" viewBox="0 0 1400 260" role="img" aria-labelledby="title desc">
+  <title id="title">veibaequant</title>
+  <desc id="desc">Quantitative Research and Data Analytics. Questions, methods, evidence, limitations.</desc>
+  <rect width="1400" height="260" rx="18" fill="#102c29"/>
+  <path d="M1010 0V260M1100 0V260M1190 0V260M1280 0V260M1370 0V260M980 50H1400M980 130H1400M980 210H1400" stroke="#24433d" fill="none"/>
+  <circle cx="1190" cy="130" r="82" fill="none" stroke="#427365"/>
+  <circle cx="1190" cy="130" r="48" fill="none" stroke="#bcd7b9"/>
+  <path d="M1108 130H1272M1190 48V212" stroke="#427365" fill="none"/>
+  <circle cx="1190" cy="130" r="5" fill="#dbd6a5"/>
+  <rect x="54" y="43" width="32" height="3" fill="#dbd6a5"/>
+  <text x="100" y="50" font-family="Arial, Helvetica, sans-serif" font-size="13" letter-spacing="3" fill="#bcd7b9">INDEPENDENT RESEARCH LAB</text>
+  <text x="54" y="135" font-family="Georgia, 'Times New Roman', serif" font-size="70" fill="#f3f0e5">veibaequant</text>
+  <text x="57" y="177" font-family="Arial, Helvetica, sans-serif" font-size="18" letter-spacing="2" fill="#bcd7b9">QUANTITATIVE RESEARCH &amp; DATA ANALYTICS</text>
+  <text x="57" y="223" font-family="Arial, Helvetica, sans-serif" font-size="12" letter-spacing="2" fill="#d6d3b1">QUESTIONS / METHODS / EVIDENCE / LIMITATIONS</text>
+</svg>
