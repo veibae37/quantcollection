@@ -2,13 +2,14 @@ const state = { programs: [], active: null };
 const $ = (selector) => document.querySelector(selector);
 const isEnglish = document.documentElement.lang === "en";
 const t = (zh, en) => isEnglish ? en : zh;
+const localize = window.SiteLocale.value;
 
 const englishPrograms = {
-  a_share_selector: ["A-share Multi-factor Selection", "Mainland A-shares", "Loads a read-only multi-factor selection snapshot from MiniQMT or validated Eastmoney market data.", "MiniQMT is preferred; validated real-market fallback data may be used."],
+  a_share_selector: ["A-share Multi-factor Selection", "Mainland A-shares", "Loads the latest validated stock-selection snapshot. Methods and data sources are shown with the results.", "MiniQMT is preferred; audited public-market data may be used when it is unavailable."],
   quant_portfolio_system: ["Market-factor Portfolio", "Active Portfolio Management", "Loads a read-only portfolio snapshot built from MiniQMT or audited public market data.", "Read-only market snapshot. No trade is sent."],
   tw_kelly_rebalance: ["TW Probability Forest Half-Kelly Rebalance", "Signals and Position Sizing", "Builds a read-only Half-Kelly plan from real selection snapshots and MiniQMT or public 15-minute OHLCV.", "Read-only market snapshot. No trade is sent."],
   bigmoneyflow: ["ETF Turnover Monitor", "Market Data", "Monitors ETF daily turnover against its trailing 20-day average using MiniQMT or AKShare.", "Read-only market snapshot. No trade is sent."],
-  boxoption2: ["ETF Option Box-spread Scanner", "Mainland ETF Options", "Scans four-leg box spreads from real MiniQMT or Eastmoney bid and ask quotes.", "Read-only market snapshot. No trade is sent."],
+  boxoption2: ["ETF Option Box-spread Scanner", "Mainland ETF Options", "Compares four-leg ETF option spreads using observed bid/ask quotes, with stated fees and execution limitations.", "Read-only research output. No order is submitted."],
   runtime_info: ["Python Runtime", "Environment Diagnostics", "Shows Python, operating system, Vercel region, and registered program count.", "Used only to verify that the Python Function starts correctly."],
   project_overview: ["Project Program Overview", "Project Diagnostics", "Read-only scan of Python files and their cloud compatibility.", "Reads filenames only and does not execute trading scripts."],
   qmt_programs: ["MiniQMT Trading Programs", "Local Trading", "Requires Windows, the broker client, local DLLs, and a signed-in trading account.", "The website only receives published read-only snapshots and never connects to a trading account."],
@@ -35,13 +36,13 @@ async function loadPrograms() {
     selectProgram((state.programs.find((item) => item.id === "a_share_selector") || state.programs[0]).id);
   } catch (error) {
     $("#runtime-state").textContent = t("API 连接失败", "API connection failed");
-    $("#program-list").innerHTML = `<div class="notice error-message">${escapeHtml(error.message)}</div>`;
+    $("#program-list").innerHTML = `<div class="notice error-message">${escapeHtml(localize(error.message, "The program list could not be loaded. Please try again."))}</div>`;
   }
 }
 
 function applyConfig(config) {
   $("#app-subtitle").textContent = t(config.subtitle, "Explainable, source-auditable research snapshots built from real A-share market data.");
-  $("#public-notice").textContent = t(config.notice, "MiniQMT is preferred, with validated real-market fallback data. No simulated fallback, investment advice, or live trading.");
+  $("#public-notice").textContent = t(config.notice, "Read-only research, not investment advice. MiniQMT is preferred; audited public feeds may be used if needed. No orders are submitted.");
   $("#python-version").textContent = config.python;
   $("#program-count").textContent = state.programs.length;
   $("#ready-count").textContent = state.programs.filter((item) => item.status === "ready").length;
@@ -77,7 +78,7 @@ function selectProgram(id) {
   $("#parameter-fields").innerHTML = program.parameters.map(fieldTemplate).join("");
   const button = $("#run-button");
   button.disabled = program.status !== "ready";
-  button.querySelector(".button-label").textContent = program.status === "ready" ? t("读取最新真实快照", "Load latest real snapshot") : t("当前环境不可运行", "Unavailable in this environment");
+  button.querySelector(".button-label").textContent = program.status === "ready" ? (["runtime_info", "project_overview"].includes(program.id) ? t("运行诊断", "Run diagnostic") : t("读取最新真实快照", "Load latest market snapshot")) : t("当前环境不可运行", "Unavailable in this environment");
   $("#result-area").classList.add("hidden");
 }
 
@@ -109,11 +110,11 @@ $("#run-form").addEventListener("submit", async (event) => {
     if (!response.ok || !payload.ok) throw new Error(payload.error || t("运行失败", "Run failed"));
     renderResult(payload.result, payload.duration_ms);
   } catch (error) {
-    renderError(error.message);
+    renderError(localize(error.message, "The snapshot could not be loaded. Please try again or check data availability."));
   } finally {
     button.disabled = false;
     button.classList.remove("loading");
-    label.textContent = t("刷新真实数据快照", "Refresh real-data snapshot");
+    label.textContent = ["runtime_info", "project_overview"].includes(state.active.id) ? t("运行诊断", "Run diagnostic") : t("刷新真实数据快照", "Reload market snapshot");
   }
 });
 
@@ -145,13 +146,13 @@ function renderSource(result) {
   }
   const details = result.source_details || {};
   const mode = details.fallback_used ? t("真实行情降级源", "Validated real-market fallback") : t("MiniQMT 真实快照", "MiniQMT real snapshot");
-  const fallback = result.fallback_reason ? ` · ${result.fallback_reason}` : "";
+  const fallback = result.fallback_reason ? t(` · ${result.fallback_reason}`, " · The primary feed was unavailable; validated public-market data is used instead. Original diagnostics are retained in the JSON.") : "";
   const provenance = [details.provider, details.access_layer, details.frequency, details.price_adjustment]
     .filter(Boolean)
-    .map((item) => escapeHtml(String(item)))
+    .map((item) => escapeHtml(localize(String(item))))
     .join(" · ");
   banner.className = "source-banner live-source";
-  banner.innerHTML = `<strong>${escapeHtml(mode)}</strong><span>${escapeHtml(result.source)} · ${t("数据时间", "Data as of")} ${escapeHtml(result.data_as_of)}${escapeHtml(fallback)}</span>${provenance ? `<small>${provenance}</small>` : ""}`;
+  banner.innerHTML = `<strong>${escapeHtml(mode)}</strong><span>${escapeHtml(localize(result.source, "Validated market snapshot; see the original JSON for full provenance."))} · ${t("数据时间", "Data as of")} ${escapeHtml(result.data_as_of)}${escapeHtml(fallback)}</span>${provenance ? `<small>${provenance}</small>` : ""}`;
 }
 
 function renderPortfolio(result) {
@@ -166,7 +167,7 @@ function renderPortfolio(result) {
     <tr>
       <td class="rank">${item.rank}</td>
       <td><strong>${escapeHtml(item.asset)}</strong></td>
-      <td><span class="board-tag">${escapeHtml(item.industry)}</span></td>
+      <td><span class="board-tag">${escapeHtml(localize(item.industry))}</span></td>
       <td>${formatNumber(item.benchmark_weight_pct, 4)}%</td>
       <td><strong>${formatNumber(item.portfolio_weight_pct, 4)}%</strong></td>
       <td class="${item.active_weight_pct >= 0 ? "positive" : "negative"}">${formatSigned(item.active_weight_pct, 4)}%</td>
@@ -187,7 +188,7 @@ function renderTwKelly(result) {
       <td class="rank">${item.position_rank}</td>
       <td><strong>${escapeHtml(item.ticker)}</strong><small>${escapeHtml(item.name)}</small></td>
       <td><span class="board-tag">${escapeHtml(item.model)}</span></td>
-      <td><span class="board-tag">${escapeHtml(item.game)}</span></td>
+      <td><span class="board-tag">${escapeHtml(localize(item.game))}</span></td>
       <td class="positive">${formatNumber(item.up_probability * 100, 2)}%</td>
       <td class="negative">${formatNumber(item.down_probability * 100, 2)}%</td>
       <td>${item.calibration_samples}</td>
@@ -209,14 +210,14 @@ function renderSelections(result) {
     <tr>
       <td class="rank">${stock.rank}</td>
       <td><strong>${escapeHtml(stock.ticker)}</strong><small>${escapeHtml(stock.name)}</small></td>
-      <td><span class="board-tag">${escapeHtml(stock.board)}</span></td>
+      <td><span class="board-tag">${escapeHtml(localize(stock.board))}</span></td>
       <td>${formatNumber(stock.latest_price, 2)}</td>
       <td class="${stock.momentum_60d_pct >= 0 ? "positive" : "negative"}">${formatSigned(stock.momentum_60d_pct)}%</td>
       <td>${formatNumber(stock.dynamic_pe, 2)}</td>
       <td>${formatNumber(stock.pb, 2)}</td>
       <td><strong>${formatNumber(stock.target_weight_pct, 3)}%</strong></td>
       <td class="${stock.active_weight_pct >= 0 ? "positive" : "negative"}">${formatSigned(stock.active_weight_pct, 3)}%</td>
-      <td><div class="reason-list">${stock.reasons.map((reason) => `<span>${escapeHtml(reason)}</span>`).join("")}</div></td>
+      <td><div class="reason-list">${stock.reasons.map((reason) => `<span>${escapeHtml(localize(reason))}</span>`).join("")}</div></td>
     </tr>`).join("");
 }
 
@@ -236,14 +237,14 @@ function renderMethodology(result) {
   const methodology = result.methodology || {};
   const entries = Object.entries(methodology);
   $("#methodology-wrap").classList.toggle("hidden", entries.length === 0);
-  $("#methodology-content").innerHTML = entries.map(([key, value]) => `<div><strong>${escapeHtml(key.replaceAll("_", " "))}</strong><span>${escapeHtml(Array.isArray(value) ? value.join("、") : value)}</span></div>`).join("");
+  $("#methodology-content").innerHTML = entries.map(([key, value]) => `<div><strong>${escapeHtml(key.replaceAll("_", " "))}</strong><span>${escapeHtml(Array.isArray(value) ? value.map((item) => localize(item)).join(t("、", "; ")) : localize(value))}</span></div>`).join("");
 }
 
 function buildMetrics(result) {
   if (result.mode === "a_share_selection") {
     const summary = result.summary;
     return [
-      [t("数据状态", "Data status"), result.source_details?.fallback_used ? `${result.source_details?.provider || t("公共数据源", "Public provider")} ${t("真实快照", "real snapshot")}` : t("MiniQMT 真实快照", "MiniQMT real snapshot")],
+      [t("数据状态", "Data status"), result.source_details?.fallback_used ? t(`${result.source_details?.provider || "公共数据源"} 真实快照`, "Validated public-market snapshot") : t("MiniQMT 真实快照", "MiniQMT real snapshot")],
       [t("可投资股票", "Eligible stocks"), summary.eligible_count],
       [t("输出标的", "Selected names"), summary.selected_count],
       [t("组合权重覆盖", "Portfolio weight coverage"), `${formatNumber(summary.selected_weight_coverage_pct, 2)}%`],
@@ -278,11 +279,11 @@ function buildMetrics(result) {
       [t("目标总仓位", "Target gross exposure"), `${formatNumber(summary.target_gross_exposure_pct, 2)}%`],
       [t("目标现金", "Target cash"), `${formatNumber(summary.target_cash_pct, 2)}%`],
       [t("调仓单数", "Proposed orders"), summary.proposed_order_count],
-      [t("模拟总资产", "Simulated assets"), `¥${formatNumber(summary.total_asset, 0)}`],
+      [t("模拟总资产", "Reference capital"), `¥${formatNumber(summary.total_asset, 0)}`],
       [t("仓位方法", "Sizing method"), t("二分之一凯利", "Half Kelly")],
     ];
   }
-  if (result.mode === "market_data") return [[t("状态", "Regime"), result.regime], [t("方向", "Direction"), result.direction], [t("代理流入", "Proxy inflow"), `${formatNumber(result.total_net_flow_cny / 1e8, 2)} ${t("亿元", "CNY 100m")}`], [t("规模占比", "Scale ratio"), `${formatNumber(result.flow_ratio_bps, 2)} bps`], [t("强度分数", "Strength score"), formatNumber(result.strength_score, 2)], [t("ETF 数量", "ETF count"), result.etf_count]];
+  if (result.mode === "market_data") return [[t("状态", "Regime"), localize(result.regime)], [t("方向", "Direction"), localize(result.direction)], [t("代理流入", "Proxy inflow"), `${formatNumber(result.total_net_flow_cny / 1e8, 2)} ${t("亿元", "CNY 100m")}`], [t("规模占比", "Scale ratio"), `${formatNumber(result.flow_ratio_bps, 2)} bps`], [t("强度分数", "Strength score"), formatNumber(result.strength_score, 2)], [t("ETF 数量", "ETF count"), result.etf_count]];
   return Object.entries(result.summary || {}).slice(0, 9).map(([key, value]) => [key.replaceAll("_", " "), value]);
 }
 
