@@ -97,20 +97,15 @@
         </section>
 
         <section class="factor-results" id="positive-factors" aria-labelledby="positive-title">
-          <div class="section-heading brain-heading"><div><p class="eyebrow">POSITIVE RETURN FACTORS</p><h2 id="positive-title">Current positive-return factors</h2></div><p>The filter is positive annualized net return after costs. C801 is the only factor in the archived backtest reports that currently passes this filter across the available universes.</p></div>
-          <div class="factor-spotlight"><div><span class="factor-code">C801</span><p>Downside Volatility Bias</p><h3>Downside Volatility Bias</h3></div><p>The factor measures the asymmetry between downside return shocks and typical volatility, then reverses the cross-sectional signal. The v2 test runs from 2021-01-04 to 2026-08-12, selects the top 50 every five trading days, and includes commissions, stamp duty, and slippage.</p></div>
+          <div class="section-heading brain-heading"><div><p class="eyebrow">FACTOR EVALUATION</p><h2 id="positive-title">Factor evaluation</h2></div><p>C801 v2 is evaluated with the existing factor and portfolio settings. Results for all four universes are retained, including negative returns.</p></div>
+          <div class="factor-spotlight"><div><span class="factor-code">C801</span><p>Downside Volatility Bias</p><h3>Downside Volatility Bias</h3></div><p>The factor and portfolio settings are unchanged: top 50 names, rebalanced every five trading days, including commission, stamp duty and slippage. Actual data periods are shown below.</p></div>
           <div class="factor-chart-grid" aria-label="C801 multi-index backtest charts">
             <article class="factor-chart-card"><header><div><p class="eyebrow">NET ASSET VALUE</p><h3>C801 net value after costs</h3></div><p>All series start at 1.00 and show the complete daily backtest path.</p></header><div class="factor-chart-legend" id="c801-nav-legend"></div><svg class="factor-chart" id="c801-nav-chart" viewBox="0 0 760 340" role="img" aria-label="C801 net asset value in CSI 300, CSI 500, CSI 1000, and the static Microcap 400 universe"></svg></article>
             <article class="factor-chart-card"><header><div><p class="eyebrow">DRAWDOWN</p><h3>Drawdown path</h3></div><p>Lower values indicate a deeper decline from the previous portfolio peak.</p></header><div class="factor-chart-legend" id="c801-dd-legend"></div><svg class="factor-chart" id="c801-dd-chart" viewBox="0 0 760 340" role="img" aria-label="C801 drawdown paths across four stock universes"></svg></article>
           </div>
           <p class="chart-data-status" id="c801-chart-status">Loading archived backtest series…</p>
-          <div class="research-table-wrap"><table class="research-table"><thead><tr><th>Factor</th><th>Universe</th><th>Constituent Method</th><th>Annual Return</th><th>Annual Alpha</th><th>Max Drawdown</th><th>Rank IC</th><th>Status</th></tr></thead><tbody>
-            <tr><td><strong>C801 v2</strong></td><td>CSI 300</td><td>Point-in-time constituents</td><td class="gain">+8.19%</td><td class="gain">+10.32%</td><td>−14.54%</td><td>0.0462</td><td><span class="result-pill strong">Positive return · Positive alpha</span></td></tr>
-            <tr><td><strong>C801 v2</strong></td><td>CSI 500</td><td>Point-in-time constituents</td><td class="gain">+5.38%</td><td class="gain">+0.91%</td><td>−11.53%</td><td>0.0498</td><td><span class="result-pill strong">Positive return · Positive alpha</span></td></tr>
-            <tr><td><strong>C801 v2</strong></td><td>CSI 1000</td><td>Point-in-time constituents</td><td class="gain">+6.98%</td><td class="gain">+3.62%</td><td>−9.77%</td><td>0.0522</td><td><span class="result-pill strong">Positive return · Positive alpha</span></td></tr>
-            <tr><td><strong>C801 v2</strong></td><td>Microcap 400</td><td>Current static constituents</td><td class="gain">+8.38%</td><td class="gain">+4.98%</td><td>−39.80%</td><td>0.0803</td><td><span class="result-pill caution">Positive return · Sensitivity test</span></td></tr>
-          </tbody></table></div>
-          <p class="table-footnote">Figures come from the archived multi-index reports. The Microcap 400 test backfills current static constituents and is exposed to survivorship bias. C101 and C102 have positive relative alpha in CSI 300 but negative absolute annualized returns, so they are excluded here.</p>
+          <div class="research-table-wrap"><table class="research-table"><thead><tr><th>Factor</th><th>Universe</th><th>Constituent Method</th><th>Annual Return</th><th>Annual Alpha</th><th>Max Drawdown</th><th>Rank IC</th><th>Status</th></tr></thead><tbody id="c801-metrics-body"><tr><td colspan="8">Loading the updated evaluation metrics…</td></tr></tbody></table></div>
+          <p class="table-footnote">The table and charts use the same evaluation output. Microcap 400 retains a fixed August 2026 cohort and is a sensitivity study with membership and survivorship limitations. Industry and market-cap neutralisation coverage must be read in the associated run diagnostics.</p>
         </section>
 
         <section class="taxonomy-section" id="factor-taxonomy" aria-labelledby="taxonomy-title">
@@ -123,7 +118,7 @@
           <p class="table-footnote">Source: XALPHA, Table 1 — Definition of the A/B/C taxonomy used by RMA. <a href="https://arxiv.org/html/2607.08332v2#S2" target="_blank" rel="noreferrer">Read the paper ↗</a></p>
         </section>
 
-        <footer><span id="public-notice">Research only. Nothing on this page is investment advice or triggers a live trade.</span><span>Built for Vercel</span></footer>
+        <footer><span id="public-notice">Research only. Nothing on this page is investment advice or triggers a live trade.</span><span><a href="/data-freshness.json">Data dates</a> · Built for Vercel</span></footer>
       </div>
       <aside class="editorial-sidebar" aria-label="Recommended reading and categories">
         <section class="sidebar-section"><p class="sidebar-kicker">THE READING LIST</p><h2>Continue reading</h2><a href="/market-sentiment">Market Sentiment Monitor<small>Six signals and index paths</small></a><a href="/backtest">Beyond the Sample<small>Training, validation, and drawdown</small></a><a href="/hk-factor-lab">Twelve Views of HK Pricing<small>Factor definitions and information boundaries</small></a></section>

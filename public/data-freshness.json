@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "requested_through": "2026-10-22",
+  "checked_at": "2026-10-22T18:18:27.411100+08:00",
+  "market_programs": {
+    "a_share_selector": {
+      "available": true,
+      "data_as_of": "2026-10-22T09:31:13.160329+00:00",
+      "market_data_date": null,
+      "source": "AKShare / 最近一次AKShare真实磁盘快照沪深A股真实行情",
+      "is_synthetic": false
+    },
+    "quant_portfolio_system": {
+      "available": true,
+      "data_as_of": "2026-10-22T09:31:13.160329+00:00",
+      "market_data_date": null,
+      "source": "AKShare / 最近一次AKShare真实磁盘快照沪深A股真实行情",
+      "is_synthetic": false
+    },
+    "tw_kelly_rebalance": {
+      "available": true,
+      "data_as_of": "2026-10-22T15:00:00+08:00",
+      "market_data_date": null,
+      "source": "AKShare / 最近一次AKShare真实磁盘快照沪深A股真实行情 + AKShare 15分钟OHLCV（东方财富前复权优先、新浪不复权回退）",
+      "is_synthetic": false
+    },
+    "boxoption2": {
+      "available": true,
+      "data_as_of": "2026-10-22T15:00:00+08:00",
+      "market_data_date": null,
+      "source": "新浪财经沪深 ETF 期权五档盘口（外部真实行情）",
+      "is_synthetic": false
+    },
+    "bigmoneyflow": {
+      "available": true,
+      "data_as_of": "2026-10-22T10:06:53.474395+00:00",
+      "market_data_date": "2026-10-22",
+      "source": "AKShare ETF历史日线 + 腾讯当日收盘成交额（真实行情）",
+      "is_synthetic": false
+    }
+  },
+  "hk_factor": {
+    "available": false,
+    "reason": "Missing licensed point-in-time analyst expectations, shareholder and analyst-network fields; no synthetic values are generated."
+  },
+  "backtest": {
+    "data_end": "2026-10-22",
+    "markets": 6,
+    "parameter_combinations_per_market": 144,
+    "qlib_archive_sha256": "0e1851b9c5aae6181031b7972214b14dd89b1f0cb8962b135890f85477499576",
+    "release": "2026-10-22"
+  },
+  "c801": [
+    {
+      "market": "csi300",
+      "data_end": "2026-10-22",
+      "observations": 1404,
+      "point_in_time_membership": true,
+      "fixed_cohort_date": null,
+      "exposure_coverage": 0.0,
+      "neutralization": "partial_exposure_with_explicit_fallback"
+    },
+    {
+      "market": "csi500",
+      "data_end": "2026-10-22",
+      "observations": 1404,
+      "point_in_time_membership": true,
+      "fixed_cohort_date": null,
+      "exposure_coverage": 0.0,
+      "neutralization": "partial_exposure_with_explicit_fallback"
+    },
+    {
+      "market": "csi1000",
+      "data_end": "2026-10-22",
+      "observations": 1404,
+      "point_in_time_membership": true,
+      "fixed_cohort_date": null,
+      "exposure_coverage": 0.0,
+      "neutralization": "partial_exposure_with_explicit_fallback"
+    },
+    {
+      "market": "micro400",
+      "data_end": "2026-10-22",
+      "observations": 1404,
+      "point_in_time_membership": false,
+      "fixed_cohort_date": "2026-08-12",
+      "exposure_coverage": 0.0,
+      "neutralization": "partial_exposure_with_explicit_fallback"
+    }
+  ],
+  "sentiment": {
+    "target_date": "2026-10-22",
+    "formal_date": "2026-10-20",
+    "status": "asof_complete",
+    "factors": [
+      {
+        "id": "pcr",
+        "as_of_date": "2026-10-21",
+        "carried_forward": true,
+        "quality_reason": "自动采用 2026-10-21 最近有效值"
+      },
+      {
+        "id": "margin",
+        "as_of_date": "2026-10-21",
+        "carried_forward": true,
+        "quality_reason": "自动采用 2026-10-21 最近有效值"
+      },
+      {
+        "id": "ivix",
+        "as_of_date": "2026-10-22",
+        "carried_forward": false,
+        "quality_reason": null
+      },
+      {
+        "id": "new_high",
+        "as_of_date": "2026-10-22",
+        "carried_forward": false,
+        "quality_reason": null
+      },
+      {
+        "id": "basis",
+        "as_of_date": "2026-10-21",
+        "carried_forward": true,
+        "quality_reason": "自动采用 2026-10-21 最近有效值"
+      },
+      {
+        "id": "stock_bond",
+        "as_of_date": "2026-10-21",
+        "carried_forward": true,
+        "quality_reason": "自动采用 2026-10-21 最近有效值"
+      }
+    ]
+  },
+  "qrs": [
+    {
+      "index": "000001.SH",
+      "data_date": "2026-10-22"
+    },
+    {
+      "index": "000300.SH",
+      "data_date": "2026-10-22"
+    },
+    {
+      "index": "399006.SZ",
+      "data_date": "2026-10-22"
+    }
+  ],
+  "runtime_info": {
+    "refresh": "Computed by the live API on each request"
+  },
+  "project_overview": {
+    "refresh": "Computed by the live API on each request"
+  },
+  "local_only_programs": {
+    "qmt_programs": "Local trading program; not executed",
+    "ml_strategy": "Local strategy context; not executed"
+  },
+  "research_method_cards": {
+    "rma": "Method description; no live result dataset shown",
+    "macro_brain": "Method description; no live result dataset shown",
+    "micro_brain": "Method description; no live result dataset shown"
+  },
+  "validation": {
+    "selected_quotes_verified": 20,
+    "kelly_bar_timestamps_verified": 20,
+    "backtest_compression_matches": true,
+    "factor_drawdowns_match": true
+  }
+}

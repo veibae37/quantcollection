@@ -21,6 +21,26 @@
   const formatDrawdown = (value) => `${(value * 100).toFixed(0)}%`;
   const marketLabel = (item) => isEnglish ? ({ csi300: "CSI 300", csi500: "CSI 500", csi1000: "CSI 1000", micro400: "Microcap 400" }[item.slug]) : item.market;
 
+  function renderMetrics(series) {
+    const body = document.querySelector("#c801-metrics-body");
+    if (!body) return;
+    body.replaceChildren();
+    const percentage = (value) => Number.isFinite(value) ? `${value >= 0 ? "+" : ""}${(value * 100).toFixed(2)}%` : "—";
+    series.forEach((item) => {
+      if (!item.metrics) throw new Error(isEnglish ? "Factor metrics are missing" : "缺少因子评估指标");
+      const metrics = item.metrics;
+      const row = document.createElement("tr");
+      const values = ["C801 v2", marketLabel(item), item.pit ? (isEnglish ? "Historical membership" : "逐时点历史成分") : (isEnglish ? "Fixed August 2026 cohort" : "2026年8月固定样本"), percentage(metrics.annualized_return), percentage(metrics.annualized_alpha), percentage(metrics.maximum_drawdown), Number.isFinite(metrics.rank_ic_mean) ? metrics.rank_ic_mean.toFixed(4) : "—", item.pit ? (isEnglish ? "Updated evaluation" : "更新评估") : (isEnglish ? "Sensitivity study" : "敏感性测试")];
+      values.forEach((value, index) => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        if ((index === 3 && metrics.annualized_return > 0) || (index === 4 && metrics.annualized_alpha > 0)) cell.className = "gain";
+        row.append(cell);
+      });
+      body.append(row);
+    });
+  }
+
   function makeLegend(id, series) {
     const legend = document.querySelector(id);
     series.forEach((item) => {
@@ -133,13 +153,17 @@
       return response.json();
     })
     .then((data) => {
+      renderMetrics(data.series);
       makeLegend("#c801-nav-legend", data.series);
       makeLegend("#c801-dd-legend", data.series);
       drawChart("#c801-nav-chart", data.series, "nav", formatNav);
       drawChart("#c801-dd-chart", data.series, "drawdown", formatDrawdown);
       const starts = data.series.map((item) => item.start).sort();
       const ends = data.series.map((item) => item.end).sort();
-      status.textContent = isEnglish ? `Data period ${formatDate(starts[0])}—${formatDate(ends.at(-1))}; charts and metrics use the complete daily backtest series. * Microcap 400 uses static constituents as a sensitivity test.` : `数据区间 ${formatDate(starts[0])}—${formatDate(ends.at(-1))}；曲线与表格均使用完整日频回测序列。* 微盘400为静态成分敏感性测试。`;
+      status.textContent = isEnglish ? `Data period ${formatDate(starts[0])}—${formatDate(ends.at(-1))}; charts and metrics come from the same run. * Microcap 400 retains the fixed August 2026 cohort as a sensitivity study.` : `数据区间 ${formatDate(starts[0])}—${formatDate(ends.at(-1))}；图表与指标来自同次评估。* 微盘400沿用2026年8月固定样本，仅作敏感性测试。`;
+      if (data.series.every((item) => item.diagnostics?.exposure_coverage === 0)) {
+        status.textContent += isEnglish ? " Industry and market-cap exposure coverage is 0%; neutralisation uses the disclosed fallback." : " 本次行业和市值暴露覆盖率为0%，中性化采用已披露的降级处理。";
+      }
     })
     .catch((error) => {
       status.textContent = isEnglish ? `Backtest charts could not be loaded: ${error.message}` : `回测曲线暂未载入：${error.message}`;

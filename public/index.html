@@ -98,10 +98,10 @@
       </section>
 
       <section class="factor-results" id="positive-factors" aria-labelledby="positive-title">
-        <div class="section-heading brain-heading"><div><p class="eyebrow">POSITIVE RETURN FACTORS</p><h2 id="positive-title">当前正收益因子</h2></div><p>筛选口径为扣费后年化绝对收益大于 0。旧回测 HTML 中满足该条件的因子只有 C801；下表合并其四个股票池结果。</p></div>
+        <div class="section-heading brain-heading"><div><p class="eyebrow">FACTOR EVALUATION</p><h2 id="positive-title">因子评估结果</h2></div><p>沿用 C801 v2 的既有因子和组合设置，更新四个股票池的结果，并保留负收益记录。</p></div>
         <div class="factor-spotlight">
           <div><span class="factor-code">C801</span><p>Downside Volatility Bias</p><h3>下行波动偏置</h3></div>
-          <p>以收益波动相对均值的偏离识别下行冲击更强的股票，并对截面信号反向排序。v2 结果区间为 2021-01-04 至 2026-08-12，Top 50、每 5 日调仓，已计佣金、印花税和滑点。</p>
+          <p>因子代码和组合设置沿用既有版本：Top 50、每 5 个交易日调仓，计入佣金、印花税与滑点。实际数据区间见下方图表。</p>
         </div>
         <div class="factor-chart-grid" aria-label="C801 多指数回测图">
           <article class="factor-chart-card">
@@ -116,13 +116,8 @@
           </article>
         </div>
         <p class="chart-data-status" id="c801-chart-status">正在读取既有回测序列…</p>
-        <div class="research-table-wrap"><table class="research-table"><thead><tr><th>因子</th><th>股票池</th><th>成分口径</th><th>年化收益</th><th>年化 Alpha</th><th>最大回撤</th><th>Rank IC</th><th>回测状态</th></tr></thead><tbody>
-          <tr><td><strong>C801 v2</strong></td><td>沪深300</td><td>逐时点历史成分</td><td class="gain">+8.19%</td><td class="gain">+10.32%</td><td>−14.54%</td><td>0.0462</td><td><span class="result-pill strong">正收益 · 正超额</span></td></tr>
-          <tr><td><strong>C801 v2</strong></td><td>中证500</td><td>逐时点历史成分</td><td class="gain">+5.38%</td><td class="gain">+0.91%</td><td>−11.53%</td><td>0.0498</td><td><span class="result-pill strong">正收益 · 正超额</span></td></tr>
-          <tr><td><strong>C801 v2</strong></td><td>中证1000</td><td>逐时点历史成分</td><td class="gain">+6.98%</td><td class="gain">+3.62%</td><td>−9.77%</td><td>0.0522</td><td><span class="result-pill strong">正收益 · 正超额</span></td></tr>
-          <tr><td><strong>C801 v2</strong></td><td>微盘400</td><td>当前静态成分回填</td><td class="gain">+8.38%</td><td class="gain">+4.98%</td><td>−39.80%</td><td>0.0803</td><td><span class="result-pill caution">正收益 · 敏感性测试</span></td></tr>
-        </tbody></table></div>
-        <p class="table-footnote">数据摘自既有多指数回测报告。微盘400存在静态成分回填带来的生存偏差风险，不能与三个逐时点指数结果等同解读。C101、C102 虽在沪深300相对基准为正超额，但绝对年化收益为负，因此未列入“正收益”表。</p>
+        <div class="research-table-wrap"><table class="research-table"><thead><tr><th>因子</th><th>股票池</th><th>成分口径</th><th>年化收益</th><th>年化 Alpha</th><th>最大回撤</th><th>Rank IC</th><th>回测状态</th></tr></thead><tbody id="c801-metrics-body"><tr><td colspan="8">正在读取更新后的评估指标…</td></tr></tbody></table></div>
+        <p class="table-footnote">表格与图表读取同次评估结果。微盘400沿用2026年8月固定样本，存在成分与生存偏差，只作敏感性测试；行业和市值中性化覆盖情况以该次运行诊断为准。</p>
       </section>
 
       <section class="taxonomy-section" id="factor-taxonomy" aria-labelledby="taxonomy-title">
@@ -134,7 +129,7 @@
         </tbody></table></div>
         <p class="table-footnote">来源：XALPHA，Table 1 — Definition of the A/B/C taxonomy used by RMA。<a href="https://arxiv.org/html/2607.08332v2#S2" target="_blank" rel="noreferrer">阅读论文原文 ↗</a></p>
       </section>
-      <footer><span id="public-notice">选股结果仅用于研究展示，不构成投资建议，也不会触发真实交易。</span><span>Built for Vercel</span></footer>
+      <footer><span id="public-notice">选股结果仅用于研究展示，不构成投资建议，也不会触发真实交易。</span><span><a href="/data-freshness.json">数据日期</a> · Built for Vercel</span></footer>
     </div>
 <aside class="editorial-sidebar" aria-label="推荐阅读与分类">
       <section class="sidebar-section"><p class="sidebar-kicker">THE READING LIST</p><h2>继续阅读</h2>

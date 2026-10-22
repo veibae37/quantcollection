@@ -20,11 +20,20 @@ BLOB_PATH = "qmt-live/latest.json"
 ALLOWED_PROGRAM_IDS = frozenset(
     {
         "a_share_selector",
-        "boxoption2",
         "quant_portfolio_system",
         "tw_kelly_rebalance",
         "bigmoneyflow",
+        "boxoption2",
         "hk_factor",
+    }
+)
+PUBLIC_FALLBACK_PROGRAM_IDS = frozenset(
+    {
+        "a_share_selector",
+        "quant_portfolio_system",
+        "tw_kelly_rebalance",
+        "bigmoneyflow",
+        "boxoption2",
     }
 )
 
@@ -72,7 +81,7 @@ def _validate_finite(value: Any, path: str = "payload") -> None:
 
 
 def validate_bundle(payload: Any) -> dict[str, Any]:
-    """Validate and return a live-only QMT bundle without mutating it."""
+    """Validate a real-data bundle without permitting synthetic fallbacks."""
     if not isinstance(payload, dict):
         raise LiveSnapshotValidationError("上传内容必须是 JSON 对象")
     if payload.get("schema_version") != SCHEMA_VERSION:
@@ -82,8 +91,8 @@ def validate_bundle(payload: Any) -> dict[str, Any]:
         raise LiveSnapshotValidationError("generated_at 不能位于未来")
 
     source = str(payload.get("source", ""))
-    if "qmt" not in source.lower():
-        raise LiveSnapshotValidationError("source 必须明确标识 QMT/MiniQMT")
+    if not any(provider in source.lower() for provider in ("qmt", "wind")):
+        raise LiveSnapshotValidationError("source 必须明确标识 Wind 或 QMT/MiniQMT")
     if payload.get("is_synthetic") not in (None, False):
         raise LiveSnapshotValidationError("拒绝演示或合成数据")
 
@@ -99,8 +108,51 @@ def validate_bundle(payload: Any) -> dict[str, Any]:
             raise LiveSnapshotValidationError(f"programs.{program_id} 必须是对象")
         if result.get("is_synthetic") is not False:
             raise LiveSnapshotValidationError(f"programs.{program_id} 不是明确的实盘结果")
-        if "qmt" not in str(result.get("source", "")).lower():
-            raise LiveSnapshotValidationError(f"programs.{program_id}.source 不是 QMT 数据源")
+        result_source = str(result.get("source", ""))
+        source_lower = result_source.lower()
+        is_qmt = "qmt" in source_lower
+        is_wind = "wind" in source_lower
+        is_public_fallback = (
+            "东方财富" in result_source
+            or "akshare" in source_lower
+            or "新浪" in result_source
+        )
+        if not is_qmt:
+            if program_id not in PUBLIC_FALLBACK_PROGRAM_IDS or not (
+                is_wind or is_public_fallback
+            ):
+                raise LiveSnapshotValidationError(
+                    f"programs.{program_id}.source 不是已批准的真实行情源"
+                )
+            details = result.get("source_details")
+            required = {
+                "provider",
+                "access_layer",
+                "endpoint",
+                "frequency",
+                "quality_checks",
+            }
+            if not isinstance(details, dict) or required - set(details):
+                raise LiveSnapshotValidationError(
+                    f"programs.{program_id} 公开行情降级快照必须提供完整 source_details"
+                )
+            if is_public_fallback and not is_wind and details.get("fallback_used") is not True:
+                raise LiveSnapshotValidationError(
+                    f"programs.{program_id} 公开行情降级快照必须标记 fallback_used"
+                )
+            if is_wind and details.get("fallback_used") is not False:
+                raise LiveSnapshotValidationError(
+                    f"programs.{program_id} Wind主源快照不能标记为fallback"
+                )
+            if not str(details.get("endpoint", "")).strip():
+                raise LiveSnapshotValidationError(
+                    f"programs.{program_id}.source_details.endpoint 不能为空"
+                )
+            checks = details.get("quality_checks")
+            if not isinstance(checks, list) or not checks:
+                raise LiveSnapshotValidationError(
+                    f"programs.{program_id}.source_details.quality_checks 不能为空"
+                )
         _parse_iso_datetime(result.get("data_as_of"), f"programs.{program_id}.data_as_of")
 
     errors = payload.get("errors", {})
@@ -170,7 +222,10 @@ def load_live_bundle() -> dict[str, Any]:
         raise LiveSnapshotUnavailable("尚未收到 QMT 实盘快照") from exc
     except Exception as exc:
         raise LiveSnapshotUnavailable("无法读取 QMT 实盘快照") from exc
-    return validate_bundle(payload)
+    try:
+        return validate_bundle(payload)
+    except LiveSnapshotValidationError as exc:
+        raise LiveSnapshotUnavailable(f"存储中的快照未通过校验：{exc}") from exc
 
 
 def get_program_snapshot(program_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
