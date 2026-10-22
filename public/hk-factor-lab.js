@@ -1,4 +1,4 @@
-const {t, value: localize} = window.SiteLocale;
+const {t: translate, value: localize} = window.SiteLocale;
 const factors = [
   { key: "dual_gap_eps", index: "01", name: "EPS 双重预期差", category: "境内外预期", formula: "Onshore EPS / Offshore EPS − 1", description: "境内 EPS 一致预期相对境外预期的偏离度，正值表示境内机构更乐观。" },
   { key: "dual_gap_net_profit", index: "02", name: "净利润双重预期差", category: "境内外预期", formula: "Onshore NP / Offshore NP − 1", description: "比较同一财政预测期的净利润判断，捕捉南下资金与外资研究定价的分歧。" },
@@ -71,13 +71,13 @@ function renderLiveTable(result, meta) {
   const rows = Array.isArray(result.rows) ? result.rows : [];
   const status = $("#live-status");
   status.className = `live-state ${meta.stale ? "stale" : "available"}`;
-  status.innerHTML = `<i></i><div><strong>${meta.stale ? t("QMT 实盘快照已过时", "The QMT snapshot is older than the freshness limit") : t("QMT 实盘快照可用", "Validated QMT snapshot available")}</strong><span>${t("生成时间", "Generated")} ${escapeHtml(meta.generated_at)} · ${t("年龄", "age")} ${Number(meta.snapshot_age_seconds)} ${t("秒", "seconds")}</span></div>`;
+  status.innerHTML = `<i></i><div><strong>${meta.stale ? translate("QMT 实盘快照已过时", "The QMT snapshot is older than the freshness limit") : translate("QMT 实盘快照可用", "Validated QMT snapshot available")}</strong><span>${translate("生成时间", "Generated")} ${escapeHtml(meta.generated_at)} · ${translate("年龄", "age")} ${Number(meta.snapshot_age_seconds)} ${translate("秒", "seconds")}</span></div>`;
   if (!rows.length) {
-    $("#live-content").innerHTML = `<p class="live-empty">${t("快照已通过来源校验，但本轮没有可展示的港股因子记录。", "The snapshot passed source validation, but this run contains no Hong Kong factor records to display.")}</p>`;
+    $("#live-content").innerHTML = `<p class="live-empty">${translate("快照已通过来源校验，但本轮没有可展示的港股因子记录。", "The snapshot passed source validation, but this run contains no Hong Kong factor records to display.")}</p>`;
     return;
   }
   const columns = ["ticker", "dual_gap_eps", "SB_Holding_Change", "QQC", "HN_z", "BP", "mmt_overnight_A", "EEChange_3M"];
-  const labels = [t("股票", "Stock"), t("EPS 预期差", "EPS expectation gap"), t("南向持仓变化", "Southbound holding change"), "QQC", "HN_z", "BP", t("隔夜动量", "Overnight momentum"), "EEChange_3M"];
+  const labels = [translate("股票", "Stock"), translate("EPS 预期差", "EPS expectation gap"), translate("南向持仓变化", "Southbound holding change"), "QQC", "HN_z", "BP", translate("隔夜动量", "Overnight momentum"), "EEChange_3M"];
   const head = labels.map((label) => `<th>${escapeHtml(label)}</th>`).join("");
   const body = rows.map((row) => `<tr>${columns.map((key, index) => `<${index ? "td" : "th"}>${escapeHtml(formatValue(row[key], index === 0))}</${index ? "td" : "th"}>`).join("")}</tr>`).join("");
   $("#live-content").innerHTML = `<div class="table-shell"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
@@ -88,13 +88,13 @@ async function loadLiveSnapshot() {
     const response = await fetch("/api/live?program=hk_factor", { cache: "no-store" });
     const payload = await response.json();
     if (!response.ok || !payload.ok) throw new Error(localize(payload.error || "QMT 实盘快照不可用", "The snapshot could not be loaded. The source response is available from the API."));
-    if (payload.result.is_synthetic !== false) throw new Error(t("服务器返回了非实盘数据，页面已拒绝显示", "The response is not marked as genuine market data and has not been displayed."));
+    if (payload.result.is_synthetic !== false) throw new Error(translate("服务器返回了非实盘数据，页面已拒绝显示", "The response is not marked as genuine market data and has not been displayed."));
     renderLiveTable(payload.result, payload.snapshot_meta);
   } catch (error) {
     const status = $("#live-status");
     status.className = "live-state unavailable";
-    status.innerHTML = `<i></i><div><strong>${t("暂无 QMT 港股因子实盘快照", "No validated Hong Kong factor snapshot is available")}</strong><span>${escapeHtml(error.message)}</span></div>`;
-    $("#live-content").innerHTML = `<p class="live-empty">${t("没有演示数据或合成回退。请保持本机 QMT 在线，并为分析师预期与网络字段接入真实 PIT 数据源。", "No demo or synthetic records are substituted. A local QMT connection and genuine point-in-time datasets for analyst expectations and network fields are required.")}</p>`;
+    status.innerHTML = `<i></i><div><strong>${translate("暂无 QMT 港股因子实盘快照", "No validated Hong Kong factor snapshot is available")}</strong><span>${escapeHtml(error.message)}</span></div>`;
+    $("#live-content").innerHTML = `<p class="live-empty">${translate("没有演示数据或合成回退。请保持本机 QMT 在线，并为分析师预期与网络字段接入真实 PIT 数据源。", "No demo or synthetic records are substituted. A local QMT connection and genuine point-in-time datasets for analyst expectations and network fields are required.")}</p>`;
   }
 }
 
