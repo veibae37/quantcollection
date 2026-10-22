@@ -1,6 +1,19 @@
 # 杂志主题交付
 
-研究页面统一加载 `public/editorial.css` 和 `public/editorial-nav.js`，保留原业务脚本及数据接口。中文首页通过 `English` 入口访问 `/en`，英文首页通过 `中文` 返回 `/`。
+研究页面统一加载 `public/editorial.css`、`public/site-locale.js` 和 `public/editorial-nav.js`，保留原业务脚本及数据接口。每个页面均可通过 `English` / `中文` 切换到同一研究的另一语言版本；导航与侧栏保持当前语言，回测参数及页内锚点随切换保留。
+
+## 中英文页面
+
+- 首页：`/` 与 `/en`。
+- 样本外测试：`/backtest` 与 `/en/backtest`。
+- 市场情绪：`/market-sentiment` 与 `/en/market-sentiment`。
+- 港股因子：`/hk-factor-lab` 与 `/en/hk-factor-lab`。
+
+英文研究页使用 `locales/pages.en.json` 中逐条审核的文案生成，动态标签、图表提示、数据不可用提示和因子说明由共享语言模块及各业务脚本处理。不调用在线机翻，也不改变数据、公式、信号或信息时点。股票名称保留交易所原名，原始 JSON 保留源语言以便核验。
+
+中文结构或静态文案变更后，先更新英文文案字典，再使用 `build_english_pages.py --patch` 生成补丁；通过补丁应用工具更新生成页面。`python build_english_pages.py` 检查生成页是否同步；新增但未经审核的中文会让构建失败，而不是静默漏译。
+
+检查命令：`python -m unittest tests.test_site_localization`、`node --test tests/site_localization.test.js`、`python verify_editorial.py`。前端测试覆盖参数保留、英文动态结果、延迟数据、十二项港股因子和源语言 JSON 保留，并对照两种语言的回测数值。
 
 ## 生产部署与版本一致性
 

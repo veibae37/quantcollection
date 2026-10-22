@@ -7,6 +7,7 @@
     <title>veibae Quant Dashboard</title>
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/editorial.css" />
+    <script src="/site-locale.js" defer></script>
     <script src="/editorial-nav.js" defer></script>
   </head>
   <body class="editorial-index">
@@ -21,9 +22,9 @@
             <button class="section-toggle" type="button" aria-expanded="false" aria-controls="section-menu">Research & Insights <span class="nav-chevron" aria-hidden="true">⌄</span></button>
             <div class="section-menu" id="section-menu">
               <a href="/en">Quant Basket <small>01 / STRATEGY</small></a>
-              <a href="/market-sentiment">Market Sentiment <small>02 / MONITOR</small></a>
-              <a href="/backtest">Out-of-sample Tests <small>03 / VALIDATE</small></a>
-              <a href="/hk-factor-lab">HK Factor Lab <small>04 / RESEARCH</small></a>
+              <a href="/en/market-sentiment">Market Sentiment <small>02 / MONITOR</small></a>
+              <a href="/en/backtest">Out-of-sample Tests <small>03 / VALIDATE</small></a>
+              <a href="/en/hk-factor-lab">HK Factor Lab <small>04 / RESEARCH</small></a>
               <a href="/en#research-engine">RMA Factor Engine <small>05 / METHOD</small></a>
             </div>
           </div>
@@ -80,7 +81,7 @@
                   <div class="table-scroll"><table><thead><tr><th>Contract</th><th>Side</th><th>Action</th><th>Quantity</th><th>Price</th></tr></thead><tbody id="orders-body"></tbody></table></div>
                 </div>
                 <details class="methodology" id="methodology-wrap"><summary>Method and limitations</summary><div id="methodology-content"></div></details>
-                <details class="raw-result"><summary>View complete JSON</summary><pre id="json-output"></pre></details>
+                <details class="raw-result"><summary>View original JSON (source language retained)</summary><pre id="json-output"></pre></details>
               </div>
             </div>
           </section>
@@ -118,12 +119,13 @@
           <p class="table-footnote">Source: XALPHA, Table 1 — Definition of the A/B/C taxonomy used by RMA. <a href="https://arxiv.org/html/2607.08332v2#S2" target="_blank" rel="noreferrer">Read the paper ↗</a></p>
         </section>
 
+        <p class="table-footnote">Company names retain their exchange labels. Original JSON records remain in the source language for audit purposes.</p>
         <footer><span id="public-notice">Research only. Nothing on this page is investment advice or triggers a live trade.</span><span><a href="/data-freshness.json">Data dates</a> · Built for Vercel</span></footer>
       </div>
       <aside class="editorial-sidebar" aria-label="Recommended reading and categories">
-        <section class="sidebar-section"><p class="sidebar-kicker">THE READING LIST</p><h2>Continue reading</h2><a href="/market-sentiment">Market Sentiment Monitor<small>Six signals and index paths</small></a><a href="/backtest">Beyond the Sample<small>Training, validation, and drawdown</small></a><a href="/hk-factor-lab">Twelve Views of HK Pricing<small>Factor definitions and information boundaries</small></a></section>
-        <section class="sidebar-section"><h2>Research categories</h2><a href="/en">Quant Basket</a><a href="/market-sentiment">Market Sentiment</a><a href="/backtest">Out-of-sample Tests</a><a href="/hk-factor-lab">HK Factors</a></section>
-        <section class="sidebar-note"><span class="sidebar-kicker">RESEARCH NOTES</span><h3>Let the data speak.<br>Keep the limits visible.</h3><p>Every signal retains its data date, method, provenance, and out-of-sample evidence.</p><a href="/backtest">Read the methodology →</a></section>
+        <section class="sidebar-section"><p class="sidebar-kicker">THE READING LIST</p><h2>Continue reading</h2><a href="/en/market-sentiment">Market Sentiment Monitor<small>Six signals and index paths</small></a><a href="/en/backtest">Beyond the Sample<small>Training, validation, and drawdown</small></a><a href="/en/hk-factor-lab">Twelve Views of HK Pricing<small>Factor definitions and information boundaries</small></a></section>
+        <section class="sidebar-section"><h2>Research categories</h2><a href="/en">Quant Basket</a><a href="/en/market-sentiment">Market Sentiment</a><a href="/en/backtest">Out-of-sample Tests</a><a href="/en/hk-factor-lab">HK Factors</a></section>
+        <section class="sidebar-note"><span class="sidebar-kicker">RESEARCH NOTES</span><h3>Let the data speak.<br>Keep the limits visible.</h3><p>Every signal retains its data date, method, provenance, and out-of-sample evidence.</p><a href="/en/backtest">Read the methodology →</a></section>
       </aside>
     </main>
     <script src="/app.js" defer></script>

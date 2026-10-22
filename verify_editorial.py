@@ -23,7 +23,7 @@ class Document(HTMLParser):
                 self.assets.append(url)
 
 root = Path(__file__).parent / 'public'
-for name in ('index', 'en', 'backtest', 'market-sentiment', 'hk-factor-lab'):
+for name in ('index', 'en', 'backtest', 'market-sentiment', 'hk-factor-lab', 'en/backtest', 'en/market-sentiment', 'en/hk-factor-lab'):
     content = (root / f'{name}.html').read_text(encoding='utf-8')
     doc = Document()
     doc.feed(content)
@@ -33,7 +33,7 @@ for name in ('index', 'en', 'backtest', 'market-sentiment', 'hk-factor-lab'):
     if name != 'chart-example':
         assert content.count('class="editorial-header"') == 1, name
         assert 'editorial-sidebar' in content, name
-    script_name = 'app' if name in ('index', 'en') else name
+    script_name = 'app' if name in ('index', 'en') else name.removeprefix('en/')
     script = (root / f'{script_name}.js').read_text(encoding='utf-8')
     # IDs in literal selectors must remain present after the header/layout change.
     missing = set(re.findall(r'\$\("#([\w-]+)"\)', script)) - set(doc.ids)
@@ -41,10 +41,14 @@ for name in ('index', 'en', 'backtest', 'market-sentiment', 'hk-factor-lab'):
     if name in ('index', 'en'):
         destination = '/en' if name == 'index' else '/'
         assert any(link.get('href') == destination and 'language-toggle' in link.get('class', '').split() for link in doc.links), name
+    else:
+        destination = '/' + name.removeprefix('en/') if name.startswith('en/') else '/en/' + name
+        assert any(link.get('href') == destination and 'language-toggle' in link.get('class', '').split() for link in doc.links), name
+    assert '/site-locale.js' in content, name
     print(f'{name}: IDs, assets, theme and script hooks OK')
 
 configuration = json.loads((root.parent / 'vercel.json').read_text(encoding='utf-8'))
 routes = {route['source']: route['destination'] for route in configuration['rewrites']}
-for route, page in (('/', 'index'), ('/en', 'en'), ('/backtest', 'backtest'), ('/market-sentiment', 'market-sentiment'), ('/hk-factor-lab', 'hk-factor-lab')):
+for route, page in (('/', 'index'), ('/en', 'en'), ('/backtest', 'backtest'), ('/market-sentiment', 'market-sentiment'), ('/hk-factor-lab', 'hk-factor-lab'), ('/en/backtest', 'en/backtest'), ('/en/market-sentiment', 'en/market-sentiment'), ('/en/hk-factor-lab', 'en/hk-factor-lab')):
     assert routes.get(route) == f'/{page}.html', route
 print('Production routes and language links OK')

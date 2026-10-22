@@ -5,6 +5,9 @@
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/en", "destination": "/en.html" },
+    { "source": "/en/backtest", "destination": "/en/backtest.html" },
+    { "source": "/en/market-sentiment", "destination": "/en/market-sentiment.html" },
+    { "source": "/en/hk-factor-lab", "destination": "/en/hk-factor-lab.html" },
     { "source": "/backtest", "destination": "/backtest.html" },
     { "source": "/market-sentiment", "destination": "/market-sentiment.html" },
     { "source": "/hk-factor-lab", "destination": "/hk-factor-lab.html" }

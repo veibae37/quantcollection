@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Explore a moving-average and low-volatility strategy with training-only parameter selection and a separate test period." />
+    <title>MA × Vol · Out-of-sample testing</title>
+    <link rel="stylesheet" href="/backtest.css" />
+    <link rel="stylesheet" href="/editorial.css" />
+    <script src="/site-locale.js" defer></script>
+    <script src="/editorial-nav.js" defer></script>
+  </head>
+  <body class="editorial-backtest">
+    <header class="editorial-header">
+      <nav class="editorial-nav" aria-label="Main navigation">
+        <a class="editorial-brand" href="/en">veibae <small>QUANTITATIVE REVIEW</small></a>
+        <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="editorial-links">☰ Menu</button>
+        <div class="editorial-links" id="editorial-links">
+          <a href="/en">Home</a>
+          <div class="nav-sections">
+            <button class="section-toggle" type="button" aria-expanded="false" aria-controls="section-menu">Research <span class="nav-chevron" aria-hidden="true">⌄</span></button>
+            <div class="section-menu" id="section-menu">
+              <a href="/en">Research dashboard <small>01 / STRATEGIES</small></a>
+              <a href="/en/market-sentiment">Market sentiment <small>02 / MONITOR</small></a>
+              <a href="/en/backtest">Out-of-sample testing <small>03 / EVALUATION</small></a>
+              <a href="/en/hk-factor-lab">HK factor research <small>04 / FACTORS</small></a>
+              <a href="/en#research-engine">RMA research pipeline <small>05 / METHODS</small></a>
+            </div>
+          </div>
+          <a class="language-toggle" href="/backtest" lang="zh-CN" hreflang="zh-CN" aria-label="Switch to Chinese">中文</a>
+        </div>
+      </nav>
+    </header>
+    <main class="editorial-layout page-shell">
+      <div class="editorial-content">
+      <section class="intro">
+        <div>
+          <p class="eyebrow">OUT-OF-SAMPLE · CONFIGURABLE</p>
+          <h1>Moving-average and low-volatility backtest</h1>
+          <p class="lede">Choose a stock universe, training and test windows, and strategy settings. Signals are formed after the close and executed at the next session’s open. Automatic selection uses training data only.</p>
+        </div>
+        <div class="date-block">
+          <span>Data through</span><strong id="data-end">Loading</strong>
+          <small id="freshness-note">Checking the data release</small>
+        </div>
+      </section>
+
+      <section class="control-panel" aria-labelledby="controls-title">
+        <div class="control-head">
+          <div><p class="eyebrow">EXPERIMENT SETUP</p><h2 id="controls-title">Experiment settings</h2></div>
+          <p id="mode-note" class="mode-note"></p>
+        </div>
+        <form id="backtest-controls" class="controls">
+          <label>Stock universe<select id="market" name="market"></select></label>
+          <label>Parameter selection<select id="mode" name="mode"><option value="auto">Select using training data</option><option value="manual">Explore manually</option></select></label>
+          <label>Training window<select id="trainMonths" name="trainMonths"></select></label>
+          <label>Test window<select id="testMonths" name="testMonths"></select></label>
+          <label>Moving-average window<select id="maWindow" name="maWindow"></select></label>
+          <label>Volatility window<select id="volWindow" name="volWindow"></select></label>
+          <label>Holding period<select id="holdDays" name="holdDays"></select></label>
+          <label>Number of holdings<select id="topK" name="topK"></select></label>
+          <label>Commission (bps)<input id="commissionBps" name="commissionBps" type="number" min="0" max="30" step="0.5" /></label>
+          <label>Stamp duty (bps)<input id="stampDutyBps" name="stampDutyBps" type="number" min="0" max="30" step="0.5" /></label>
+          <label>Slippage per side (bps)<input id="slippageBps" name="slippageBps" type="number" min="0" max="50" step="0.5" /></label>
+        </form>
+        <div class="selection-line">
+          <span id="split-summary"></span><strong id="parameter-summary"></strong>
+        </div>
+      </section>
+
+      <section aria-labelledby="result-title">
+        <div class="section-title">
+          <div><p class="eyebrow">HOLDOUT RESULT</p><h2 id="result-title">Results on the test sample</h2></div>
+          <p id="universe-note"></p>
+        </div>
+        <div id="metric-cards" class="metric-cards" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><p class="eyebrow">PATH</p><h2>Portfolio value and drawdowns</h2></div>
+          <div class="legend"><span class="strategy-key">Strategy</span><span class="benchmark-key">Benchmark</span></div>
+        </div>
+        <div class="chart-grid">
+          <div>
+            <div class="chart-label"><span>Cumulative portfolio value</span><span id="period-count"></span></div>
+            <div id="nav-chart" class="chart line-chart" role="img" aria-label="Cumulative portfolio value: strategy and benchmark"></div>
+          </div>
+          <div>
+            <div class="chart-label"><span>Strategy drawdown</span><span id="drawdown-value"></span></div>
+            <div id="drawdown-chart" class="chart line-chart" role="img" aria-label="Strategy drawdown over time"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><p class="eyebrow">INDEX COMPARISON</p><h2>The same settings across stock universes</h2></div>
+          <p class="panel-caption">Automatic selection uses the chosen universe’s training sample. The selected settings are then applied to the other universes without adjustment.</p>
+        </div>
+        <div id="return-chart" class="chart" role="img" aria-label="Annualised strategy and benchmark returns across stock universes"></div>
+      </section>
+
+      <section class="notes">
+        <div><p class="eyebrow">RESEARCH BOUNDARY</p><h2>Evaluation safeguards</h2></div>
+        <ul>
+          <li>Moving averages, volatility and liquidity measures use lagged observations. Signals cannot be executed before the next session’s open.</li>
+          <li>Automatic selection ranks a fixed parameter grid by training-period excess Sharpe, less a turnover penalty. Test-period results do not enter this ranking.</li>
+          <li>Changing settings after inspecting test results introduces multiple-testing bias. Manual mode is exploratory, not independent out-of-sample evidence.</li>
+          <li>CSI 300, 500, 800 and 1000 use Qlib’s historical index membership. The CSI 2000 and microcap universes are proxies based on lagged liquidity, not official index constituents.</li>
+          <li>These results are research records, not investment advice or a promise of future returns.</li>
+        </ul>
+      </section>
+    </div>
+<aside class="editorial-sidebar" aria-label="Related research and topics">
+      <section class="sidebar-section"><p class="sidebar-kicker">THE READING LIST</p><h2>Related research</h2>
+        <a href="/en/market-sentiment">Market sentiment monitor<small>Six signals alongside market indices</small></a>
+        <a href="/en/backtest">Testing beyond the training sample<small>Training, evaluation and drawdowns</small></a>
+        <a href="/en/hk-factor-lab">Twelve perspectives on Hong Kong equities<small>Factor definitions and data availability</small></a>
+      </section>
+      <section class="sidebar-section"><h2>Research topics</h2><a href="/en">Research dashboard</a><a href="/en/market-sentiment">Market sentiment</a><a href="/en/backtest">Out-of-sample testing</a><a href="/en/hk-factor-lab">HK factor research</a></section>
+      <section class="sidebar-note"><span class="sidebar-kicker">RESEARCH NOTES</span><h3>Follow the evidence.<br>Keep the limitations in view.</h3><p>Each study records its data dates, assumptions and out-of-sample checks.</p><a href="/en/backtest">Read the testing approach →</a></section>
+    </aside>
+    </main>
+    <footer>MA × Vol walk-forward · reproducible research console</footer>
+    <script src="/backtest.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="A-share sentiment research: six daily signals, six months of market context and the latest QRS index overlay." />
+    <title>Market sentiment · veibae Quantitative Review</title>
+    <link rel="stylesheet" href="/market-sentiment.css" />
+    <link rel="stylesheet" href="/editorial.css" />
+    <script src="/site-locale.js" defer></script>
+    <script src="/editorial-nav.js" defer></script>
+  </head>
+  <body class="editorial-market-sentiment">
+    <header class="editorial-header">
+      <nav class="editorial-nav" aria-label="Main navigation">
+        <a class="editorial-brand" href="/en">veibae <small>QUANTITATIVE REVIEW</small></a>
+        <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="editorial-links">☰ Menu</button>
+        <div class="editorial-links" id="editorial-links">
+          <a href="/en">Home</a>
+          <div class="nav-sections">
+            <button class="section-toggle" type="button" aria-expanded="false" aria-controls="section-menu">Research <span class="nav-chevron" aria-hidden="true">⌄</span></button>
+            <div class="section-menu" id="section-menu">
+              <a href="/en">Research dashboard <small>01 / STRATEGIES</small></a>
+              <a href="/en/market-sentiment">Market sentiment <small>02 / MONITOR</small></a>
+              <a href="/en/backtest">Out-of-sample testing <small>03 / EVALUATION</small></a>
+              <a href="/en/hk-factor-lab">HK factor research <small>04 / FACTORS</small></a>
+              <a href="/en#research-engine">RMA research pipeline <small>05 / METHODS</small></a>
+            </div>
+          </div>
+          <a class="language-toggle" href="/market-sentiment" lang="zh-CN" hreflang="zh-CN" aria-label="Switch to Chinese">中文</a>
+          <span class="nav-status">Updated <span id="generated-at">Loading</span></span>
+        </div>
+      </nav>
+    </header>
+
+    <main class="editorial-layout">
+      <div class="editorial-content">
+      <div class="section-kicker"><span>MARKETS &amp; RESEARCH</span><time id="target-date">—</time></div>
+
+      <section class="lead-story">
+        <div class="lead-copy">
+          <p class="rubric">A-SHARE SENTIMENT</p>
+          <h1>Market sentiment monitor</h1>
+          <p class="standfirst">Six measures—options activity, margin financing, volatility, market breadth, futures basis and equity–bond turnover—form a daily score between −1 and +1. The separate QRS overlay studies index support and resistance. Where a release is delayed, the latest valid prior observation is used and its actual date remains visible.</p>
+        </div>
+        <aside class="score-card" aria-label="Latest market sentiment score">
+          <div class="score-meta"><span id="score-status">—</span><span id="score-caption">Please wait</span></div>
+          <div class="score-main"><strong id="score">—</strong><div><b id="score-label">Loading</b><small>Composite sentiment score</small></div></div>
+          <div class="meter"><span></span><i id="meter-pin"></i></div>
+          <div class="meter-labels"><span>−1 Bearish</span><span>0</span><span>+1 Bullish</span></div>
+          <div class="score-facts">
+            <div><strong id="bullish-count">—</strong><span>Bullish signals</span></div>
+            <div><strong id="bearish-count">—</strong><span>Bearish signals</span></div>
+            <div><strong id="coverage">—</strong><span>Available coverage</span></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="story-section weekly-section">
+        <div class="story-heading">
+          <div><p class="rubric">Five-session monitor</p><h2>Six signals over the past five sessions</h2></div>
+          <p>Each value is followed by its directional signal. A carried observation comes from the most recent valid release available on that date.</p>
+        </div>
+        <div class="table-frame">
+          <table class="weekly-table">
+            <thead id="weekly-head"><tr><th>Indicator</th><th>Loading observations</th></tr></thead>
+            <tbody id="weekly-body"><tr><td colspan="6">Loading the five-session comparison…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="legend"><span><i class="bull"></i>Bullish +1</span><span><i class="neutral"></i>Neutral 0</span><span><i class="bear"></i>Bearish −1</span></div>
+      </section>
+
+      <section class="story-section history-section">
+        <div class="story-heading">
+          <div><p class="rubric">Six-month trend</p><h2>Sentiment and market performance over six months</h2></div>
+          <p id="history-range">—</p>
+        </div>
+        <div class="chart-legend" aria-label="Chart legend">
+          <span><i class="legend-line sentiment"></i>Sentiment score (left axis)</span>
+          <span><i class="legend-line shanghai"></i>Shanghai Composite (right axis)</span>
+          <span><i class="legend-line csi300"></i>CSI 300 (right axis)</span>
+        </div>
+        <div class="chart-wrap">
+          <svg id="history-chart" viewbox="0 0 1000 380" role="img" aria-label="Six months of A-share sentiment alongside the Shanghai Composite and CSI 300"></svg>
+          <div id="chart-tooltip" class="chart-tooltip" hidden></div>
+        </div>
+        <div class="chart-note">All series share the same trading-date axis. Sentiment uses the left scale (−1 to +1). Both indices use the right scale, rebased to 100 at their first valid observation. Grey sentiment points include at least one carried-forward input.</div>
+      </section>
+
+      <section class="story-section qrs-section">
+        <div class="story-heading">
+          <div><p class="rubric">QRS timing overlay</p><h2>QRS: index support and resistance</h2></div>
+          <p id="qrs-date">Loading the latest QRS observations</p>
+        </div>
+        <p class="qrs-intro">QRS is an index exposure overlay, not a stock-selection model or a source of index-enhancement alpha. It can adjust the risk budget of an existing portfolio. A reading above +0.15 switches to long exposure; below −0.15 switches to cash. Between the thresholds, the previous state is retained.</p>
+        <div class="table-frame">
+          <table class="qrs-table">
+            <thead>
+              <tr><th>Index</th><th>Index level</th><th>QRS</th><th>Exposure state</th><th>Signal date</th><th>Index return since signal</th><th>Adaptive bandwidth</th></tr>
+            </thead>
+            <tbody id="qrs-body"><tr><td colspan="7">Loading QRS readings…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="qrs-note">Signals use the closing data for the stated date; backtest execution begins no earlier than the next session. QRS is reported separately and is not included in the six-factor sentiment score.</div>
+      </section>
+
+      <section class="bottom-grid">
+        <article class="method-card">
+          <p class="rubric">Method</p>
+          <h2>How the score is built</h2>
+          <p>Each component contributes −1, 0 or +1, combined using fixed weights. Calculations use retrieved market observations; missing data is never replaced with simulated values.</p>
+          <div id="factor-weights" class="factor-weights"></div>
+        </article>
+        <article class="audit-card">
+          <div class="audit-title"><div><p class="rubric">Data audit</p><h2>Data availability</h2></div><span id="quality-summary">—</span></div>
+          <div id="quality-list" class="quality-list"></div>
+        </article>
+      </section>
+
+      <section id="notice" class="notice" aria-live="polite"></section>
+    </div>
+<aside class="editorial-sidebar" aria-label="Related research and topics">
+      <section class="sidebar-section"><p class="sidebar-kicker">THE READING LIST</p><h2>Related research</h2>
+        <a href="/en/market-sentiment">Market sentiment monitor<small>Six signals alongside market indices</small></a>
+        <a href="/en/backtest">Testing beyond the training sample<small>Training, evaluation and drawdowns</small></a>
+        <a href="/en/hk-factor-lab">Twelve perspectives on Hong Kong equities<small>Factor definitions and data availability</small></a>
+      </section>
+      <section class="sidebar-section"><h2>Research topics</h2><a href="/en">Research dashboard</a><a href="/en/market-sentiment">Market sentiment</a><a href="/en/backtest">Out-of-sample testing</a><a href="/en/hk-factor-lab">HK factor research</a></section>
+      <section class="sidebar-note"><span class="sidebar-kicker">RESEARCH NOTES</span><h3>Follow the evidence.<br>Keep the limitations in view.</h3><p>Each study records its data dates, assumptions and out-of-sample checks.</p><a href="/en/backtest">Read the testing approach →</a></section>
+    </aside>
+    </main>
+    <footer class="page-footer"><span>veibae Quantitative Review</span><span>For quantitative research only. Not investment advice.</span></footer>
+    <script src="/market-sentiment.js" defer></script>
+  </body>
+</html>
