@@ -3,22 +3,42 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="A 股多因子选股与 Python 量化策略 Vercel 运行看板" />
-    <title>veibae量化篮子</title>
+    <meta name="description" content="veibae 量化看板：策略程序、RMA、Macro Brain、Micro Brain 与多指数因子回测" />
+    <title>veibae量化看板</title>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/editorial.css" />
+    <script src="/editorial-nav.js" defer></script>
   </head>
-  <body>
+  <body class="editorial-index">
     <div class="glow glow-one"></div><div class="glow glow-two"></div>
-    <header class="site-header">
-      <a class="brand" href="/" aria-label="返回首页"><span class="brand-mark">Q</span><span>Quant Console</span></a>
-      <div class="header-actions"><a class="lab-entry" href="/hk-factor-lab">HK FACTOR LAB</a><div class="runtime-pill"><span class="live-dot"></span><span id="runtime-state">API 检测中</span></div></div>
+    <header class="editorial-header">
+      <nav class="editorial-nav" aria-label="主导航">
+        <a class="editorial-brand" href="/">veibae <small>QUANTITATIVE REVIEW</small></a>
+        <button class="nav-toggle" type="button" aria-label="打开导航" aria-expanded="false" aria-controls="editorial-links">☰ 菜单</button>
+        <div class="editorial-links" id="editorial-links">
+          <a href="/">首页</a>
+          <div class="nav-sections">
+            <button class="section-toggle" type="button" aria-expanded="false" aria-controls="section-menu">研究与资讯 <span class="nav-chevron" aria-hidden="true">⌄</span></button>
+            <div class="section-menu" id="section-menu">
+              <a href="/">量化篮子 <small>01 / 策略</small></a>
+              <a href="/market-sentiment">市场情绪 <small>02 / 观察</small></a>
+              <a href="/backtest">样本外回测 <small>03 / 验证</small></a>
+              <a href="/hk-factor-lab">港股因子 <small>04 / 研究</small></a>
+              <a href="/#research-engine">RMA 因子引擎 <small>05 / 方法</small></a>
+            </div>
+          </div>
+          <a class="language-toggle" href="/en" lang="en" hreflang="en" aria-label="Switch to English">English</a>
+          <span class="nav-status" id="runtime-state">API 检测中</span>
+        </div>
+      </nav>
     </header>
-    <main>
+    <main class="editorial-layout">
+      <div class="editorial-content">
       <section class="hero">
         <div>
           <p class="eyebrow">A-SHARE · MULTI-FACTOR · QP</p>
-          <h1 id="app-name">veibae<br /><span>量化篮子</span></h1>
-          <p id="app-subtitle" class="hero-copy">从沪深 A 股可交易池生成可解释的多因子候选组合</p>
+          <h1 id="app-name">veibae量化看板</h1>
+          <p id="app-subtitle" class="hero-copy">从真实 A 股行情生成可解释、来源可审计的只读量化快照</p>
         </div>
         <div class="hero-stats" aria-label="项目概况">
           <div><strong id="ready-count">—</strong><span>云端可运行</span></div>
@@ -49,10 +69,6 @@
                 <div class="table-title"><div><h3>A 股候选标的</h3><p id="selection-subtitle"></p></div><span>目标权重来自完整候选池优化</span></div>
                 <div class="table-scroll"><table class="selection-table"><thead><tr><th>#</th><th>代码 / 名称</th><th>板块</th><th>最新价</th><th>60日动量</th><th>P/E</th><th>P/B</th><th>目标权重</th><th>主动权重</th><th>主要入选理由</th></tr></thead><tbody id="selection-body"></tbody></table></div>
               </div>
-              <div id="option-wrap" class="selection-wrap hidden">
-                <div class="table-title"><div><h3>沪深 ETF 盒式价差候选</h3><p id="option-subtitle"></p></div><span>买卖一报价 · 已扣费用与滑点</span></div>
-                <div class="table-scroll"><table class="selection-table option-table"><thead><tr><th>#</th><th>标的</th><th>交易所</th><th>到期日</th><th>K Low</th><th>K High</th><th>单位公允价值</th><th>单位净支出</th><th>毛利润(元/套)</th><th>费用+滑点(元/套)</th><th>真实净利润(元/套)</th><th>四腿最小深度</th></tr></thead><tbody id="option-body"></tbody></table></div>
-              </div>
               <div id="portfolio-wrap" class="selection-wrap hidden">
                 <div class="table-title"><div><h3>QMT 市场因子组合</h3><p id="portfolio-subtitle"></p></div><span>MiniQMT 实盘快照 · 不构成投资建议</span></div>
                 <div class="table-scroll"><table class="selection-table portfolio-table"><thead><tr><th>#</th><th>资产</th><th>行业</th><th>基准权重</th><th>优化权重</th><th>主动权重</th><th>Alpha 预测</th></tr></thead><tbody id="portfolio-body"></tbody></table></div>
@@ -71,8 +87,66 @@
           </div>
         </section>
       </section>
+      <section class="brain-section" id="research-engine" aria-labelledby="brain-title">
+        <div class="section-heading brain-heading"><div><p class="eyebrow">RMA FACTOR ENGINE</p><h2 id="brain-title">RMA 与 Brain 如何把研报做成因子</h2></div><p>研究引擎按“吸收证据、规划假设、生成因子、回测反馈”运行，让每个信号都能追溯到原始研报和明确的市场机制。</p></div>
+        <div class="brain-flow">
+          <article id="rma" class="brain-card"><span>01</span><p class="eyebrow">REPORT → MEMORY</p><h3>RMA</h3><p>读取本地研报、CF40、东方财富等来源，把文本切成证据片段。先用 A 层判断日频 OHLCV 是否足以表达，再映射到 B 层机制家族与 C 层研究类型，写入可追溯记忆。</p><ul><li>输入：研究报告与来源信息</li><li>输出：A1/A0、B 类、C 类及证据位置</li><li>边界：不把宏观叙述直接伪装成可交易因子</li></ul></article>
+          <article id="macro-brain" class="brain-card"><span>02</span><p class="eyebrow">MEMORY → PLAN</p><h3>Macro Brain</h3><p>结合 RMA 覆盖量与 Cross Brain 的 GOOD/BAD 经验，为 16 个 B 类机制和 48 个 C 类研究类型评分，选出一个主机制、3—4 个辅助机制与 3—5 个研究代理。</p><ul><li>输入：RMA 记忆与历史回测经验</li><li>输出：周期主题、研究假设与 Agent 任务</li><li>路由：自动探索、粗方向引导或固定主题</li></ul></article>
+          <article id="micro-brain" class="brain-card"><span>03</span><p class="eyebrow">PLAN → FACTOR</p><h3>Micro Brain</h3><p>把每个 C 类假设转成白名单算子的 Python 因子，可执行种子生成、变异、交叉、精炼和新颖性注入。因子必须通过代码、机制、数值、未来数据扰动与经济稳健性检查。</p><ul><li>输入：Macro Agent 的假设与机制约束</li><li>输出：因子代码、质量报告与修复建议</li><li>去向：父代池、精英池或退回修复</li></ul></article>
+        </div>
+        <p class="pipeline-note"><strong>运行方式：</strong>把研报交给 RMA 做 A/B/C 分类 → Macro Brain 从证据与历史成败中提出可证伪假设 → Micro Brain 生成只使用获准字段的因子代码并通过质量门 → 因子进入多指数、扣费后回测。Rank IC、超额收益、回撤和换手再写回 Cross Brain，影响下一轮选题。</p>
+      </section>
+
+      <section class="factor-results" id="positive-factors" aria-labelledby="positive-title">
+        <div class="section-heading brain-heading"><div><p class="eyebrow">POSITIVE RETURN FACTORS</p><h2 id="positive-title">当前正收益因子</h2></div><p>筛选口径为扣费后年化绝对收益大于 0。旧回测 HTML 中满足该条件的因子只有 C801；下表合并其四个股票池结果。</p></div>
+        <div class="factor-spotlight">
+          <div><span class="factor-code">C801</span><p>Downside Volatility Bias</p><h3>下行波动偏置</h3></div>
+          <p>以收益波动相对均值的偏离识别下行冲击更强的股票，并对截面信号反向排序。v2 结果区间为 2021-01-04 至 2026-08-12，Top 50、每 5 日调仓，已计佣金、印花税和滑点。</p>
+        </div>
+        <div class="factor-chart-grid" aria-label="C801 多指数回测图">
+          <article class="factor-chart-card">
+            <header><div><p class="eyebrow">NET ASSET VALUE</p><h3>C801 扣费后净值</h3></div><p>起点归一为 1.00；展示四个股票池的实际回测路径。</p></header>
+            <div class="factor-chart-legend" id="c801-nav-legend"></div>
+            <svg class="factor-chart" id="c801-nav-chart" viewBox="0 0 760 340" role="img" aria-label="C801 在沪深300、中证500、中证1000和微盘400中的扣费后净值曲线"></svg>
+          </article>
+          <article class="factor-chart-card">
+            <header><div><p class="eyebrow">DRAWDOWN</p><h3>回撤路径</h3></div><p>曲线越低表示从此前净值高点回落越深。</p></header>
+            <div class="factor-chart-legend" id="c801-dd-legend"></div>
+            <svg class="factor-chart" id="c801-dd-chart" viewBox="0 0 760 340" role="img" aria-label="C801 在四个股票池中的回撤曲线"></svg>
+          </article>
+        </div>
+        <p class="chart-data-status" id="c801-chart-status">正在读取既有回测序列…</p>
+        <div class="research-table-wrap"><table class="research-table"><thead><tr><th>因子</th><th>股票池</th><th>成分口径</th><th>年化收益</th><th>年化 Alpha</th><th>最大回撤</th><th>Rank IC</th><th>回测状态</th></tr></thead><tbody>
+          <tr><td><strong>C801 v2</strong></td><td>沪深300</td><td>逐时点历史成分</td><td class="gain">+8.19%</td><td class="gain">+10.32%</td><td>−14.54%</td><td>0.0462</td><td><span class="result-pill strong">正收益 · 正超额</span></td></tr>
+          <tr><td><strong>C801 v2</strong></td><td>中证500</td><td>逐时点历史成分</td><td class="gain">+5.38%</td><td class="gain">+0.91%</td><td>−11.53%</td><td>0.0498</td><td><span class="result-pill strong">正收益 · 正超额</span></td></tr>
+          <tr><td><strong>C801 v2</strong></td><td>中证1000</td><td>逐时点历史成分</td><td class="gain">+6.98%</td><td class="gain">+3.62%</td><td>−9.77%</td><td>0.0522</td><td><span class="result-pill strong">正收益 · 正超额</span></td></tr>
+          <tr><td><strong>C801 v2</strong></td><td>微盘400</td><td>当前静态成分回填</td><td class="gain">+8.38%</td><td class="gain">+4.98%</td><td>−39.80%</td><td>0.0803</td><td><span class="result-pill caution">正收益 · 敏感性测试</span></td></tr>
+        </tbody></table></div>
+        <p class="table-footnote">数据摘自既有多指数回测报告。微盘400存在静态成分回填带来的生存偏差风险，不能与三个逐时点指数结果等同解读。C101、C102 虽在沪深300相对基准为正超额，但绝对年化收益为负，因此未列入“正收益”表。</p>
+      </section>
+
+      <section class="taxonomy-section" id="factor-taxonomy" aria-labelledby="taxonomy-title">
+        <div class="section-heading brain-heading"><div><p class="eyebrow">XALPHA · TABLE 1</p><h2 id="taxonomy-title">RMA 使用的 A/B/C 分类</h2></div><p>按论文原表，三层分类把研报证据依次转换为 OHLCV 准入判断、机制家族和可检索的 Research Archetype。C 层是研究提示，不是因子公式。</p></div>
+        <div class="research-table-wrap"><table class="research-table taxonomy-table"><thead><tr><th>层级</th><th>输入单元</th><th>输出</th><th>在 XALPHA 中的作用</th></tr></thead><tbody>
+          <tr><td><strong>A-layer</strong></td><td>研报片段或证据块</td><td>KEEP/DROP 判断及 OHLCV 可行性理由</td><td>按照日频 OHLCV 因子契约筛选证据。</td></tr>
+          <tr><td><strong>B-layer</strong></td><td>经 A 层批准的研究路径原子</td><td>宽泛的机制家族归属和可复用研究路径</td><td>把保留证据归入粗粒度金融机制，供 Macro Brain 路由。</td></tr>
+          <tr><td><strong>C-layer</strong></td><td>B 层研究路径</td><td>包含机制角色和研报依据路径的 Research Archetype 记录</td><td>为假设规划构造可执行的原型记忆；它本身不是因子公式。</td></tr>
+        </tbody></table></div>
+        <p class="table-footnote">来源：XALPHA，Table 1 — Definition of the A/B/C taxonomy used by RMA。<a href="https://arxiv.org/html/2607.08332v2#S2" target="_blank" rel="noreferrer">阅读论文原文 ↗</a></p>
+      </section>
       <footer><span id="public-notice">选股结果仅用于研究展示，不构成投资建议，也不会触发真实交易。</span><span>Built for Vercel</span></footer>
+    </div>
+<aside class="editorial-sidebar" aria-label="推荐阅读与分类">
+      <section class="sidebar-section"><p class="sidebar-kicker">THE READING LIST</p><h2>继续阅读</h2>
+        <a href="/market-sentiment">市场情绪观察<small>六维信号与指数走势</small></a>
+        <a href="/backtest">把策略放到样本之外<small>训练、验证与回撤路径</small></a>
+        <a href="/hk-factor-lab">港股定价的十二个切面<small>因子定义与信息边界</small></a>
+      </section>
+      <section class="sidebar-section"><h2>研究分类</h2><a href="/">量化篮子</a><a href="/market-sentiment">市场情绪</a><a href="/backtest">样本外回测</a><a href="/hk-factor-lab">港股因子</a></section>
+      <section class="sidebar-note"><span class="sidebar-kicker">RESEARCH NOTES</span><h3>让数据讲述，<br>也让边界可见。</h3><p>从信号到证据，保留数据日期、方法口径与样本外检验。</p><a href="/backtest">阅读回测方法 →</a></section>
+    </aside>
     </main>
     <script src="/app.js" defer></script>
+    <script src="/c801-charts.js" defer></script>
   </body>
 </html>

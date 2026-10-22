@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="可配置的均线与波动率复合因子严格样本外回测。" />
+    <title>MA × Vol 可配置回测</title>
+    <link rel="stylesheet" href="/backtest.css" />
+    <link rel="stylesheet" href="/editorial.css" />
+    <script src="/editorial-nav.js" defer></script>
+  </head>
+  <body class="editorial-backtest">
+    <header class="editorial-header">
+      <nav class="editorial-nav" aria-label="主导航">
+        <a class="editorial-brand" href="/">veibae <small>QUANTITATIVE REVIEW</small></a>
+        <button class="nav-toggle" type="button" aria-label="打开导航" aria-expanded="false" aria-controls="editorial-links">☰ 菜单</button>
+        <div class="editorial-links" id="editorial-links">
+          <a href="/">首页</a>
+          <div class="nav-sections">
+            <button class="section-toggle" type="button" aria-expanded="false" aria-controls="section-menu">研究与资讯 <span class="nav-chevron" aria-hidden="true">⌄</span></button>
+            <div class="section-menu" id="section-menu">
+              <a href="/">量化篮子 <small>01 / 策略</small></a>
+              <a href="/market-sentiment">市场情绪 <small>02 / 观察</small></a>
+              <a href="/backtest">样本外回测 <small>03 / 验证</small></a>
+              <a href="/hk-factor-lab">港股因子 <small>04 / 研究</small></a>
+              <a href="/#research-engine">RMA 因子引擎 <small>05 / 方法</small></a>
+            </div>
+          </div>
+
+        </div>
+      </nav>
+    </header>
+    <main class="editorial-layout page-shell">
+      <div class="editorial-content">
+      <section class="intro">
+        <div>
+          <p class="eyebrow">OUT-OF-SAMPLE · CONFIGURABLE</p>
+          <h1>均线 × 低波动突破回测</h1>
+          <p class="lede">选择指数、训练/测试长度和策略参数。信号在收盘后形成，下一交易日开盘执行；自动选参严格只使用训练集。</p>
+        </div>
+        <div class="date-block">
+          <span>实际数据截止</span><strong id="data-end">加载中</strong>
+          <small id="freshness-note">正在核验数据版本</small>
+        </div>
+      </section>
+
+      <section class="control-panel" aria-labelledby="controls-title">
+        <div class="control-head">
+          <div><p class="eyebrow">EXPERIMENT SETUP</p><h2 id="controls-title">回测参数</h2></div>
+          <p id="mode-note" class="mode-note"></p>
+        </div>
+        <form id="backtest-controls" class="controls">
+          <label>回测指数<select id="market" name="market"></select></label>
+          <label>选参模式<select id="mode" name="mode"><option value="auto">训练集自动选参</option><option value="manual">手动探索</option></select></label>
+          <label>训练集<select id="trainMonths" name="trainMonths"></select></label>
+          <label>测试集<select id="testMonths" name="testMonths"></select></label>
+          <label>均线窗口<select id="maWindow" name="maWindow"></select></label>
+          <label>波动率窗口<select id="volWindow" name="volWindow"></select></label>
+          <label>持有天数<select id="holdDays" name="holdDays"></select></label>
+          <label>持仓数量<select id="topK" name="topK"></select></label>
+          <label>佣金（bps）<input id="commissionBps" name="commissionBps" type="number" min="0" max="30" step="0.5" /></label>
+          <label>印花税（bps）<input id="stampDutyBps" name="stampDutyBps" type="number" min="0" max="30" step="0.5" /></label>
+          <label>单边滑点（bps）<input id="slippageBps" name="slippageBps" type="number" min="0" max="50" step="0.5" /></label>
+        </form>
+        <div class="selection-line">
+          <span id="split-summary"></span><strong id="parameter-summary"></strong>
+        </div>
+      </section>
+
+      <section aria-labelledby="result-title">
+        <div class="section-title">
+          <div><p class="eyebrow">HOLDOUT RESULT</p><h2 id="result-title">样本外测试结果</h2></div>
+          <p id="universe-note"></p>
+        </div>
+        <div id="metric-cards" class="metric-cards" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><p class="eyebrow">PATH</p><h2>净值与回撤路径</h2></div>
+          <div class="legend"><span class="strategy-key">策略</span><span class="benchmark-key">基准</span></div>
+        </div>
+        <div class="chart-grid">
+          <div>
+            <div class="chart-label"><span>累计净值</span><span id="period-count"></span></div>
+            <div id="nav-chart" class="chart line-chart" role="img" aria-label="策略与基准累计净值曲线"></div>
+          </div>
+          <div>
+            <div class="chart-label"><span>策略回撤</span><span id="drawdown-value"></span></div>
+            <div id="drawdown-chart" class="chart line-chart" role="img" aria-label="策略回撤曲线"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div><p class="eyebrow">INDEX COMPARISON</p><h2>同参数跨指数比较</h2></div>
+          <p class="panel-caption">自动模式的参数只由当前所选指数训练集决定，再原样应用到其他指数。</p>
+        </div>
+        <div id="return-chart" class="chart" role="img" aria-label="各指数策略与基准年化收益柱状图"></div>
+      </section>
+
+      <section class="notes">
+        <div><p class="eyebrow">RESEARCH BOUNDARY</p><h2>防作弊边界</h2></div>
+        <ul>
+          <li>所有均线、历史波动率及流动性窗口都使用滞后数据；信号最早在下一交易日开盘执行。</li>
+          <li>“训练集自动选参”仅在固定候选网格中按训练期超额 Sharpe 减换手惩罚排名，测试期不参与选择。</li>
+          <li>手动反复查看测试结果属于多重检验，页面会标记为探索性，不应宣称为严格样本外证据。</li>
+          <li>沪深300、中证500、中证800和中证1000使用 Qlib 逐时点历史成分；中证2000与微盘为滞后流动性代理池。</li>
+          <li>结果为研究记录，不构成收益承诺或投资建议。</li>
+        </ul>
+      </section>
+    </div>
+<aside class="editorial-sidebar" aria-label="推荐阅读与分类">
+      <section class="sidebar-section"><p class="sidebar-kicker">THE READING LIST</p><h2>继续阅读</h2>
+        <a href="/market-sentiment">市场情绪观察<small>六维信号与指数走势</small></a>
+        <a href="/backtest">把策略放到样本之外<small>训练、验证与回撤路径</small></a>
+        <a href="/hk-factor-lab">港股定价的十二个切面<small>因子定义与信息边界</small></a>
+      </section>
+      <section class="sidebar-section"><h2>研究分类</h2><a href="/">量化篮子</a><a href="/market-sentiment">市场情绪</a><a href="/backtest">样本外回测</a><a href="/hk-factor-lab">港股因子</a></section>
+      <section class="sidebar-note"><span class="sidebar-kicker">RESEARCH NOTES</span><h3>让数据讲述，<br>也让边界可见。</h3><p>从信号到证据，保留数据日期、方法口径与样本外检验。</p><a href="/backtest">阅读回测方法 →</a></section>
+    </aside>
+    </main>
+    <footer>MA × Vol walk-forward · reproducible research console</footer>
+    <script src="/backtest.js" defer></script>
+  </body>
+</html>

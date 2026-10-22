@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="veibae Quant Dashboard: live research programs, the RMA factor engine, and multi-index factor backtests." />
+    <title>veibae Quant Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/editorial.css" />
+    <script src="/editorial-nav.js" defer></script>
+  </head>
+  <body class="editorial-index">
+    <div class="glow glow-one"></div><div class="glow glow-two"></div>
+    <header class="editorial-header">
+      <nav class="editorial-nav" aria-label="Main navigation">
+        <a class="editorial-brand" href="/en">veibae <small>QUANTITATIVE REVIEW</small></a>
+        <button class="nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="editorial-links">☰ Menu</button>
+        <div class="editorial-links" id="editorial-links">
+          <a href="/en">Home</a>
+          <div class="nav-sections">
+            <button class="section-toggle" type="button" aria-expanded="false" aria-controls="section-menu">Research & Insights <span class="nav-chevron" aria-hidden="true">⌄</span></button>
+            <div class="section-menu" id="section-menu">
+              <a href="/en">Quant Basket <small>01 / STRATEGY</small></a>
+              <a href="/market-sentiment">Market Sentiment <small>02 / MONITOR</small></a>
+              <a href="/backtest">Out-of-sample Tests <small>03 / VALIDATE</small></a>
+              <a href="/hk-factor-lab">HK Factor Lab <small>04 / RESEARCH</small></a>
+              <a href="/en#research-engine">RMA Factor Engine <small>05 / METHOD</small></a>
+            </div>
+          </div>
+          <a class="language-toggle" href="/" lang="zh-CN" hreflang="zh-CN" aria-label="切换到中文">中文</a>
+          <span class="nav-status" id="runtime-state">Checking API</span>
+        </div>
+      </nav>
+    </header>
+    <main class="editorial-layout">
+      <div class="editorial-content">
+        <section class="hero">
+          <div>
+            <p class="eyebrow">A-SHARE · MULTI-FACTOR · QP</p>
+            <h1 id="app-name">veibae Quant Dashboard</h1>
+            <p id="app-subtitle" class="hero-copy">Explainable, source-auditable research snapshots built from real A-share market data.</p>
+          </div>
+          <div class="hero-stats" aria-label="Project overview">
+            <div><strong id="ready-count">—</strong><span>Cloud ready</span></div>
+            <div><strong id="program-count">—</strong><span>Programs</span></div>
+            <div><strong id="python-version">—</strong><span>Python</span></div>
+          </div>
+        </section>
+
+        <section class="workspace">
+          <aside class="program-panel">
+            <div class="section-heading"><div><p class="eyebrow">PROGRAMS</p><h2>Select a program</h2></div><span id="program-total" class="count-badge">0</span></div>
+            <div id="program-list" class="program-list" aria-live="polite"><div class="skeleton tall"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+          </aside>
+          <section class="console-panel">
+            <div id="empty-console" class="empty-console"><div class="empty-icon">◫</div><h2>Select a program</h2><p>Review its method, set parameters, and run the cloud analysis.</p></div>
+            <div id="active-console" class="active-console hidden">
+              <div class="console-topbar"><div><p id="active-category" class="eyebrow"></p><h2 id="active-title"></h2><p id="active-description" class="muted"></p></div><span id="active-status" class="status-badge"></span></div>
+              <div id="program-notice" class="notice info hidden"></div>
+              <div id="local-warning" class="notice warning hidden"></div>
+              <form id="run-form"><div id="parameter-fields" class="parameter-grid"></div><button id="run-button" class="run-button" type="submit"><span class="button-label">Load latest real snapshot</span><span class="button-arrow">→</span></button></form>
+              <div id="result-area" class="result-area hidden" aria-live="polite">
+                <div class="result-header"><div><span class="live-dot"></span><strong>Result</strong></div><span id="duration" class="duration"></span></div>
+                <div id="source-banner" class="source-banner hidden"></div>
+                <div id="metric-grid" class="metric-grid"></div>
+                <div id="selection-wrap" class="selection-wrap hidden">
+                  <div class="table-title"><div><h3>A-share candidates</h3><p id="selection-subtitle"></p></div><span>Target weights use the full optimized universe</span></div>
+                  <div class="table-scroll"><table class="selection-table"><thead><tr><th>#</th><th>Ticker / Name</th><th>Board</th><th>Last</th><th>60D Momentum</th><th>P/E</th><th>P/B</th><th>Target Weight</th><th>Active Weight</th><th>Selection Rationale</th></tr></thead><tbody id="selection-body"></tbody></table></div>
+                </div>
+                <div id="portfolio-wrap" class="selection-wrap hidden">
+                  <div class="table-title"><div><h3>QMT market-factor portfolio</h3><p id="portfolio-subtitle"></p></div><span>Read-only MiniQMT snapshot · Not investment advice</span></div>
+                  <div class="table-scroll"><table class="selection-table portfolio-table"><thead><tr><th>#</th><th>Asset</th><th>Industry</th><th>Benchmark</th><th>Optimized</th><th>Active</th><th>Alpha Forecast</th></tr></thead><tbody id="portfolio-body"></tbody></table></div>
+                </div>
+                <div id="tw-kelly-wrap" class="selection-wrap hidden">
+                  <div class="table-title"><div><h3>Top-20 probabilities and half-Kelly weights</h3><p id="tw-kelly-subtitle"></p></div><span>Read-only web view · Local MiniQMT execution</span></div>
+                  <div class="table-scroll"><table class="selection-table tw-kelly-table"><thead><tr><th>Rank</th><th>Ticker / Name</th><th>Model</th><th>State</th><th>P(up)</th><th>P(down)</th><th>Calibration</th><th>Half Kelly</th><th>Target Weight</th><th>Reference Price</th></tr></thead><tbody id="tw-kelly-body"></tbody></table></div>
+                </div>
+                <div id="orders-wrap" class="orders-wrap hidden">
+                  <div class="table-title"><h3>Proposed orders</h3><span>Read-only · No orders are sent</span></div>
+                  <div class="table-scroll"><table><thead><tr><th>Contract</th><th>Side</th><th>Action</th><th>Quantity</th><th>Price</th></tr></thead><tbody id="orders-body"></tbody></table></div>
+                </div>
+                <details class="methodology" id="methodology-wrap"><summary>Method and limitations</summary><div id="methodology-content"></div></details>
+                <details class="raw-result"><summary>View complete JSON</summary><pre id="json-output"></pre></details>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section class="brain-section" id="research-engine" aria-labelledby="brain-title">
+          <div class="section-heading brain-heading"><div><p class="eyebrow">RMA FACTOR ENGINE</p><h2 id="brain-title">How RMA and the Brains turn reports into factors</h2></div><p>The engine absorbs evidence, plans hypotheses, generates factor code, and learns from backtest feedback. Every signal remains traceable to a report and a financial mechanism.</p></div>
+          <div class="brain-flow">
+            <article id="rma" class="brain-card"><span>01</span><p class="eyebrow">REPORT → MEMORY</p><h3>RMA</h3><p>RMA reads local reports and external research, breaks the text into evidence chunks, screens each chunk for daily OHLCV feasibility, and writes accepted mechanisms into traceable A/B/C memory.</p><ul><li>Input: reports and source metadata</li><li>Output: A-layer decision, B-layer family, and C-layer archetype</li><li>Boundary: unavailable information is not disguised as a tradable factor</li></ul></article>
+            <article id="macro-brain" class="brain-card"><span>02</span><p class="eyebrow">MEMORY → PLAN</p><h3>Macro Brain</h3><p>Macro Brain combines RMA coverage with GOOD/BAD discovery feedback. It selects one primary mechanism, supporting mechanisms, and report-grounded Research Archetypes for the next cycle.</p><ul><li>Input: RMA memory and prior backtest feedback</li><li>Output: cycle theme, hypotheses, and agent bundle</li><li>Routing: fixed theme, coarse guided, or memory driven</li></ul></article>
+            <article id="micro-brain" class="brain-card"><span>03</span><p class="eyebrow">PLAN → FACTOR</p><h3>Micro Brain</h3><p>Micro Brain converts each hypothesis into executable Python factor code, then evolves candidates through mutation, crossover, refinement, and novelty injection under strict quality gates.</p><ul><li>Input: hypotheses and mechanism constraints</li><li>Output: factor code, quality report, and repair guidance</li><li>Destination: parent pool, elite archive, or repair queue</li></ul></article>
+          </div>
+          <p class="pipeline-note"><strong>Operating loop:</strong> RMA classifies report evidence → Macro Brain proposes falsifiable hypotheses → Micro Brain writes approved-field factor code and passes the quality gates → candidates enter cost-aware multi-index backtests. Rank IC, alpha, drawdown, and turnover are written back to Cross Brain for the next cycle.</p>
+        </section>
+
+        <section class="factor-results" id="positive-factors" aria-labelledby="positive-title">
+          <div class="section-heading brain-heading"><div><p class="eyebrow">POSITIVE RETURN FACTORS</p><h2 id="positive-title">Current positive-return factors</h2></div><p>The filter is positive annualized net return after costs. C801 is the only factor in the archived backtest reports that currently passes this filter across the available universes.</p></div>
+          <div class="factor-spotlight"><div><span class="factor-code">C801</span><p>Downside Volatility Bias</p><h3>Downside Volatility Bias</h3></div><p>The factor measures the asymmetry between downside return shocks and typical volatility, then reverses the cross-sectional signal. The v2 test runs from 2021-01-04 to 2026-08-12, selects the top 50 every five trading days, and includes commissions, stamp duty, and slippage.</p></div>
+          <div class="factor-chart-grid" aria-label="C801 multi-index backtest charts">
+            <article class="factor-chart-card"><header><div><p class="eyebrow">NET ASSET VALUE</p><h3>C801 net value after costs</h3></div><p>All series start at 1.00 and show the complete daily backtest path.</p></header><div class="factor-chart-legend" id="c801-nav-legend"></div><svg class="factor-chart" id="c801-nav-chart" viewBox="0 0 760 340" role="img" aria-label="C801 net asset value in CSI 300, CSI 500, CSI 1000, and the static Microcap 400 universe"></svg></article>
+            <article class="factor-chart-card"><header><div><p class="eyebrow">DRAWDOWN</p><h3>Drawdown path</h3></div><p>Lower values indicate a deeper decline from the previous portfolio peak.</p></header><div class="factor-chart-legend" id="c801-dd-legend"></div><svg class="factor-chart" id="c801-dd-chart" viewBox="0 0 760 340" role="img" aria-label="C801 drawdown paths across four stock universes"></svg></article>
+          </div>
+          <p class="chart-data-status" id="c801-chart-status">Loading archived backtest series…</p>
+          <div class="research-table-wrap"><table class="research-table"><thead><tr><th>Factor</th><th>Universe</th><th>Constituent Method</th><th>Annual Return</th><th>Annual Alpha</th><th>Max Drawdown</th><th>Rank IC</th><th>Status</th></tr></thead><tbody>
+            <tr><td><strong>C801 v2</strong></td><td>CSI 300</td><td>Point-in-time constituents</td><td class="gain">+8.19%</td><td class="gain">+10.32%</td><td>−14.54%</td><td>0.0462</td><td><span class="result-pill strong">Positive return · Positive alpha</span></td></tr>
+            <tr><td><strong>C801 v2</strong></td><td>CSI 500</td><td>Point-in-time constituents</td><td class="gain">+5.38%</td><td class="gain">+0.91%</td><td>−11.53%</td><td>0.0498</td><td><span class="result-pill strong">Positive return · Positive alpha</span></td></tr>
+            <tr><td><strong>C801 v2</strong></td><td>CSI 1000</td><td>Point-in-time constituents</td><td class="gain">+6.98%</td><td class="gain">+3.62%</td><td>−9.77%</td><td>0.0522</td><td><span class="result-pill strong">Positive return · Positive alpha</span></td></tr>
+            <tr><td><strong>C801 v2</strong></td><td>Microcap 400</td><td>Current static constituents</td><td class="gain">+8.38%</td><td class="gain">+4.98%</td><td>−39.80%</td><td>0.0803</td><td><span class="result-pill caution">Positive return · Sensitivity test</span></td></tr>
+          </tbody></table></div>
+          <p class="table-footnote">Figures come from the archived multi-index reports. The Microcap 400 test backfills current static constituents and is exposed to survivorship bias. C101 and C102 have positive relative alpha in CSI 300 but negative absolute annualized returns, so they are excluded here.</p>
+        </section>
+
+        <section class="taxonomy-section" id="factor-taxonomy" aria-labelledby="taxonomy-title">
+          <div class="section-heading brain-heading"><div><p class="eyebrow">XALPHA · TABLE 1</p><h2 id="taxonomy-title">The A/B/C taxonomy used by RMA</h2></div><p>The paper defines a three-stage transformation from report evidence to OHLCV eligibility, mechanism families, and retrievable Research Archetypes. A C-layer archetype is a research cue, not a factor formula.</p></div>
+          <div class="research-table-wrap"><table class="research-table taxonomy-table"><thead><tr><th>Layer</th><th>Input unit</th><th>Output</th><th>Role in XALPHA</th></tr></thead><tbody>
+            <tr><td><strong>A-layer</strong></td><td>Report fragment or evidence chunk</td><td>KEEP/DROP decision with an OHLCV feasibility reason</td><td>Filters evidence according to the daily OHLCV factor contract.</td></tr>
+            <tr><td><strong>B-layer</strong></td><td>A-layer-approved research-path atom</td><td>Broad mechanism-family assignment and reusable research path</td><td>Groups retained evidence into coarse financial mechanisms for Macro Brain routing.</td></tr>
+            <tr><td><strong>C-layer</strong></td><td>B-layer research path</td><td>Research Archetype record with mechanism role and report-grounded paths</td><td>Constructs actionable archetype memory for hypothesis planning; it is not itself a factor formula.</td></tr>
+          </tbody></table></div>
+          <p class="table-footnote">Source: XALPHA, Table 1 — Definition of the A/B/C taxonomy used by RMA. <a href="https://arxiv.org/html/2607.08332v2#S2" target="_blank" rel="noreferrer">Read the paper ↗</a></p>
+        </section>
+
+        <footer><span id="public-notice">Research only. Nothing on this page is investment advice or triggers a live trade.</span><span>Built for Vercel</span></footer>
+      </div>
+      <aside class="editorial-sidebar" aria-label="Recommended reading and categories">
+        <section class="sidebar-section"><p class="sidebar-kicker">THE READING LIST</p><h2>Continue reading</h2><a href="/market-sentiment">Market Sentiment Monitor<small>Six signals and index paths</small></a><a href="/backtest">Beyond the Sample<small>Training, validation, and drawdown</small></a><a href="/hk-factor-lab">Twelve Views of HK Pricing<small>Factor definitions and information boundaries</small></a></section>
+        <section class="sidebar-section"><h2>Research categories</h2><a href="/en">Quant Basket</a><a href="/market-sentiment">Market Sentiment</a><a href="/backtest">Out-of-sample Tests</a><a href="/hk-factor-lab">HK Factors</a></section>
+        <section class="sidebar-note"><span class="sidebar-kicker">RESEARCH NOTES</span><h3>Let the data speak.<br>Keep the limits visible.</h3><p>Every signal retains its data date, method, provenance, and out-of-sample evidence.</p><a href="/backtest">Read the methodology →</a></section>
+      </aside>
+    </main>
+    <script src="/app.js" defer></script>
+    <script src="/c801-charts.js" defer></script>
+  </body>
+</html>

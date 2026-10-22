@@ -4,12 +4,15 @@
   "trailingSlash": false,
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
+    { "source": "/en", "destination": "/en.html" },
+    { "source": "/backtest", "destination": "/backtest.html" },
+    { "source": "/market-sentiment", "destination": "/market-sentiment.html" },
     { "source": "/hk-factor-lab", "destination": "/hk-factor-lab.html" }
   ],
   "functions": {
     "api/*.py": {
       "maxDuration": 60,
-      "excludeFiles": "{xtquant/**,ml/**,tests/**,outputs/**,**/__pycache__/**,**/*.pyc,**/*.pyd,**/*.dll,**/*.pdf,**/*.ipynb}"
+      "excludeFiles": "{.runtime/**,.venv/**,.venv-qlib/**,hk-factor-site/**,xtquant/**,ml/**,tests/**,outputs/**,**/__pycache__/**,**/*.pyc,**/*.pyd,**/*.dll,**/*.pdf,**/*.ipynb}"
     }
   },
   "headers": [
